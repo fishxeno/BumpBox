@@ -30,8 +30,6 @@ app.get('/api/items', (req, res) => {
 });
 
 app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
-  // console.log(req.body);
-  // console.log(req.headers);
   console.log(req.rawBody);
   res.sendStatus(200);
 });
