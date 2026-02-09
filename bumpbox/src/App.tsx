@@ -1,10 +1,9 @@
-import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  
 
   return (
     <>
@@ -18,9 +17,10 @@ function App() {
       </div>
       <h1>Vite + React</h1>
       <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
+        <a href="https://buy.stripe.com/test_6oU7sL2EJdClbcYe6j6oo01" target='_blank'>
+        test stripe payment
+        </a>
+
         <p>
           Edit <code>src/App.tsx</code> and save to test HMR
         </p>

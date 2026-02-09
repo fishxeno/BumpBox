@@ -1,15 +1,19 @@
 const express = require('express');
-const cors = require('cors');
 const app = express();
 const port = 3000;
+require('dotenv').config();
+// const path = require('path');
 
-// Enable CORS for all origins (simple usage)
-const corsOptions = {
-  origin: 'http://localhost:3001', // Replace with your client-side origin
-  optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
-};
 
-app.use(cors(corsOptions));
+const stripePublishKey = process.env.STRIPE_PUBLISHABLE_KEY || undefined;
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY || undefined;
+const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_KEY || undefined;
+
+app.use(methodOverride()); //override method names for older clients
+app.use(express.json()); // to parse json form data
+app.use(express.urlencoded({ extended: true }));
+
+app.set('trust proxy', true);
 
 // Define a sample route
 app.get('/api/data', (req, res) => {
@@ -17,6 +21,20 @@ app.get('/api/data', (req, res) => {
     message: 'Hello from the CORS-enabled server!'
   });
 });
+
+app.get('/api/items', (req, res) => {
+  res.json({
+    items: ['item1', 'item2', 'item3']
+  });
+});
+
+app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  // console.log(req.body);
+  // console.log(req.headers);
+  console.log(req.rawBody);
+  res.sendStatus(200);
+});
+
 
 // Start the server
 app.listen(port, () => {
