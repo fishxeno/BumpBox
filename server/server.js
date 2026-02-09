@@ -16,13 +16,6 @@ app.use(express.urlencoded({ extended: true }));
 
 app.set('trust proxy', true);
 
-// Define a sample route
-app.get('/api/data', (req, res) => {
-  res.json({
-    message: 'Hello from the CORS-enabled server!'
-  });
-});
-
 app.get('/api/items', (req, res) => {
   res.json({
     items: ['item1', 'item2', 'item3']
