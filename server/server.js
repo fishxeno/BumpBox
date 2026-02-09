@@ -13,7 +13,7 @@ const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_KEY || undefined;
 app.use(methodOverride()); //override method names for older clients
 app.use(express.json()); // to parse json form data
 app.use(express.urlencoded({ extended: true }));
-
+app.use(express.static("public")); // to use static files
 app.set('trust proxy', true);
 
 app.get('/api/items', (req, res) => {

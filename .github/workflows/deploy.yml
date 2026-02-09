@@ -28,24 +28,32 @@ jobs:
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v6
       with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-        cache-dependency-path: |
-          bumpbox/package-lock.json
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: |
+            bumpbox/package-lock.json
+            server/package-lock.json
 
     - name: Install frontend dependencies
       working-directory: ./bumpbox
       run: npm ci
 
     - name: Build frontend
-      run: npm run --prefix bumpbox build --if-present
+      working-directory: ./bumpbox
+      run: npm run build
+
+    - name: Copy frontend build into server
+      run: |
+        rm -rf server/public
+        mkdir -p server/public
+        cp -r bumpbox/dist/* server/public/
 
     - name: Generate deployment package
       working-directory: ./server
       run: zip -D -q -r -X deploy.zip . -x "./node_modules/*"
 
     - name: Upload deployment package
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: deploy
         path: ./server/deploy.zip
