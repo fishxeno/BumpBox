@@ -2,8 +2,9 @@ const express = require('express');
 const app = express();
 const port = 3000;
 require('dotenv').config();
-// const path = require('path');
-
+const db = require('./dbConnection');
+const cors = require('cors');
+const methodOverride = require('method-override');
 
 const stripePublishKey = process.env.STRIPE_PUBLISHABLE_KEY || undefined;
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || undefined;
