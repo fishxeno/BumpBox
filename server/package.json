@@ -1,8 +1,11 @@
 {
+  "name": "server",
+  "version": "0.0.0",
+  "type": "module",
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
-    "express": "^5.2.1",
+    "express": "^4.22.1",
     "method-override": "^3.0.0",
     "mysql2": "^3.16.3",
     "stripe": "^20.3.0"
