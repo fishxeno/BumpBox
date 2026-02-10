@@ -40,6 +40,7 @@ jobs:
       - name: Build frontend
         working-directory: bumpbox
         run: npm run build
+        
 
       - name: Copy frontend build into server
         run: |
