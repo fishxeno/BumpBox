@@ -2,7 +2,7 @@ import { createPool } from "mysql2";
 
 let pool;
 
-export function initDB() {
+export default function initDB() {
   pool = createPool({
     database: 'bumpbox',
     host: process.env.MYSQL_HOST,
