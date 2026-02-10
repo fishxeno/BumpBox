@@ -1,9 +1,9 @@
-const mysql = require("mysql2");
+import { createPool } from "mysql2";
 
 let pool;
 
-function initDB() {
-  pool = mysql.createPool({
+export function initDB() {
+  pool = createPool({
     database: 'bumpbox',
     host: process.env.MYSQL_HOST,
     port: process.env.MYSQL_PORT,
@@ -21,5 +21,3 @@ function initDB() {
     }
   });
 }
-
-module.exports = { initDB };

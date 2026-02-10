@@ -1,16 +1,40 @@
 import express, { raw, json, urlencoded, static as expressStatic } from 'express';
-const app = express();
-require('dotenv').config();
+import 'dotenv/config';
 import cors from 'cors';
 import { resolve, join } from 'path';
 import methodOverride from 'method-override';
-import { initDB } from './dbConnection.js';
+
+import { createPool } from "mysql2";
+
+let pool;
+
+function initDB() {
+  pool = createPool({
+    database: 'bumpbox',
+    host: process.env.MYSQL_HOST,
+    port: process.env.MYSQL_PORT,
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD,
+    timezone: "+00:00",
+    connectionLimit: 5
+  });
+
+  pool.getConnection((err) => {
+    if (err) {
+      console.error("DB connection failed:", err);
+    } else {
+      console.log("DB connected");
+    }
+  });
+}
+
 initDB();
 
 // const stripePublishKey = process.env.STRIPE_PUBLISHABLE_KEY || undefined;
 // const stripeSecretKey = process.env.STRIPE_SECRET_KEY || undefined;
 // const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_KEY || undefined;
 
+const app = express();
 
 app.post('/webhook', raw({ type: 'application/json' }), (req, res) => {
   console.log(req.rawBody);
