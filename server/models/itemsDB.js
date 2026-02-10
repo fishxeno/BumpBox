@@ -1,4 +1,4 @@
-const db = require('../dbConnection');
+const db = require('../dbConnection').default;
 const Joi = require('joi');
 
 const items = {

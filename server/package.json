@@ -11,6 +11,6 @@
     "stripe": "^20.3.0"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "node -r dotenv/config server.js"
   }
 }

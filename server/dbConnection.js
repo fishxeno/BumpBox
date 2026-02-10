@@ -1,7 +1,7 @@
-const mysql = require('mysql2');
+import { createPool } from 'mysql2';
+import 'dotenv/config';
 
-const db = mysql
-  .createPool({
+const db = createPool({
     database: 'bumpbox',
     host: process.env.MYSQL_HOST,
     port: process.env.MYSQL_PORT,
@@ -10,4 +10,4 @@ const db = mysql
     timezone: "+00:00",
 }).promise()
 
-module.exports = db;
+export default db;
