@@ -10,10 +10,6 @@ const __dirname = resolve();
 app.use(expressStatic(join(__dirname, "public")));
 app.set('trust proxy', true);
 
-console.log(
-	  `DB HOST: ${process.env.MYSQL_HOST}, PORT: ${process.env.MYSQL_PORT}, USER: ${process.env.MYSQL_USER}`
-)
-
 // Database connection
 const pool = createPool({
 	database: 'bumpbox',
