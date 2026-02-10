@@ -1,11 +1,11 @@
 import express, { raw, json, urlencoded, static as expressStatic } from 'express';
-import 'dotenv/config';
+import * as dotenv from 'dotenv';
 import cors from 'cors';
 import { resolve, join } from 'path';
 import methodOverride from 'method-override';
-
 import { createPool } from "mysql2";
 
+dotenv.config();
 let pool;
 
 function initDB() {
@@ -15,8 +15,6 @@ function initDB() {
     port: process.env.MYSQL_PORT,
     user: process.env.MYSQL_USER,
     password: process.env.MYSQL_PASSWORD,
-    timezone: "+00:00",
-    connectionLimit: 5
   });
 
   pool.getConnection((err) => {
