@@ -67,7 +67,7 @@ The system must autonomously adjust pricing to maximize conversion while respect
 ### 3.5 Security & Validation (The "Digital Twin")
 *   **Ingestion (Seller Drop-off):**
     *   **Video Logging:** Machine records the seller placing the item.
-    *   **Volumetric Scan:** LiDAR/Ultrasonic + Weight sensors create a baseline density profile.
+    *   **Volumetric Scan:** Weight sensors create a baseline density profile.
     *   **Visual Scan:** AI Computer Vision scans for scratches and surface details.
 *   **Return Verification:**
     *   Upon return, the system compares the current weight, volume, and visual surface against the baseline.
@@ -91,7 +91,6 @@ The system must autonomously adjust pricing to maximize conversion while respect
     *   **Interest Sensors:** Eye tracking, Heat/PIR sensors, or Face detection (to measure "Dwell Time" for pricing algo).
 *   **Scale/Volume:**
     *   High-precision load cell (Weight).
-    *   LiDAR or Ultrasonic module (Volumetric scanning).
 
 ### 4.3 Interface & Feedback
 *   **Main Display:** LCD Screen or Tablet interface for browsing/payment.
@@ -136,7 +135,7 @@ The system must autonomously adjust pricing to maximize conversion while respect
 2.  **Arrival:** Seller arrives at machine, scans QR code to identify session.
 3.  **Verification:** Machine initiates recording.
 4.  **Deposit:** Door opens. Seller places item inside.
-5.  **Scanning:** Machine locks door. Internal sensors perform Volumetric (LiDAR) and Weight scan. Camera takes high-res photos.
+5.  **Scanning:** Machine locks door. Internal sensors perform Weight scan. Camera takes high-res photos.
 6.  **Confirmation:** "Digital Twin" created. Item goes live.
 
 ### 6.2 Buyer Flow (Direct Purchase)
