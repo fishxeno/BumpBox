@@ -6,8 +6,8 @@ on:
   create:
 
 env:
-  EB_DEV_APP: BumpBox2
-  EB_DEV_ENV: BumpBox2-env
+  EB_DEV_APP: BumpBox
+  EB_DEV_ENV: BumpBox-env-1
 
 jobs:
   build:
@@ -40,7 +40,7 @@ jobs:
       - name: Build frontend
         working-directory: bumpbox
         run: npm run build
-        
+
 
       - name: Copy frontend build into server
         run: |
