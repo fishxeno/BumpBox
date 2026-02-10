@@ -4,7 +4,7 @@ require('dotenv').config();
 import cors from 'cors';
 import { resolve, join } from 'path';
 import methodOverride from 'method-override';
-import { initDB } from './dbConnection';
+import { initDB } from './dbConnection.js';
 initDB();
 
 // const stripePublishKey = process.env.STRIPE_PUBLISHABLE_KEY || undefined;
