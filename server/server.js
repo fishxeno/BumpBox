@@ -6,9 +6,9 @@ const cors = require('cors');
 const path = require('path');
 const methodOverride = require('method-override');
 
-const stripePublishKey = process.env.STRIPE_PUBLISHABLE_KEY || undefined;
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY || undefined;
-const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_KEY || undefined;
+// const stripePublishKey = process.env.STRIPE_PUBLISHABLE_KEY || undefined;
+// const stripeSecretKey = process.env.STRIPE_SECRET_KEY || undefined;
+// const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_KEY || undefined;
 
 app.use(methodOverride()); //override method names for older clients
 app.use(express.json()); // to parse json form data
