@@ -26,7 +26,7 @@ app.use(methodOverride()); //override method names for older clients
 //   });
 // });
 
-// router.get('/api/items/:itemId/status', items.getItemStatusById);
+// router.get('/api/items/:itemId/status', items.getItemStatusById)
 app.get('/api/item/status', async (req, res) => {
     try {
         const itemId = req.query.itemId;
