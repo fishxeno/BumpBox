@@ -1,5 +1,5 @@
-const db = require('../dbConnection').default;
-const Joi = require('joi');
+import db from '../dbConnection.js';
+import Joi from 'joi';
 
 const items = {
     validateAccess: (id = 'params.itemId') => {
@@ -35,4 +35,38 @@ const items = {
             return res.status(400).json({ error: 'Invalid data format' });
         }
     },
-}
+
+    getItemStatusById: async (itemId) => {
+        try {
+            const query = `SELECT * FROM items WHERE id = ?`;
+            const [rows] = await db.execute(query, [itemId]);
+            if (rows.length === 0) {
+                throw new Error('404', 'Item not found');
+            }
+            if (rows[0].status == 'true') {
+                res.status(200).json({ status: true, message: 'Item is sold' });
+            }
+            res.status(200).json({ status: false, message: 'Item is not sold' });
+        } catch (error) {
+            console.error('Get item error:', error.stack);
+            throw new Error('500', 'Error fetching item');
+        }
+    },
+    createNewItem: async (itemData) => {
+        try {
+            const query = `INSERT INTO items (userId, itemname, price, description) VALUES (?, ?, ?, ?)`;
+            const [result] = await db.execute(query, [
+                itemData.userId,
+                itemData.itemname,
+                itemData.price,
+                itemData.description
+            ]);
+            return result;
+        } catch (error) {
+            console.error('Create new item error:', error.stack);
+            throw new Error('500', 'Error creating new item');
+        }
+    },
+};
+
+export default items;
