@@ -1,16 +1,17 @@
 # bumpbox_panel
 
-A new Flutter project.
+A Flutter app to be displayed on the BumpBox as a dashboard screen.
 
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+# TODOs
+- [ ] Pricing algorithm
+    - [x] Face and attention detection
+    - [ ] Reduce price by day
+    - [ ] Halt price reduction with attention data and clicks on the website (get from backend)
+    - [ ] Exaggerate the pricing algorithm increase/decrease based on facial recognition
+- [ ] Display item details
+- [ ] Let users pay for item on dashboard
+- [ ] Testing flow
+    - [ ] When user click on test, prompt for card
+    - [ ] Prompt user that they will be refunded 
+    - [ ] On card payment success, open locker and start 5 minute timer
+    - [ ] After 5 minute timer, re
