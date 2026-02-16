@@ -237,12 +237,14 @@ class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  _currentState?.isPayingAttention ?? false
-                      ? Icons.check_circle
-                      : Icons.visibility_off,
-                  size: 64,
-                  color: _getStatusColor(),
+                Expanded(
+                  child: Icon(
+                    _currentState?.isPayingAttention ?? false
+                        ? Icons.check_circle
+                        : Icons.visibility_off,
+                    size: 64,
+                    color: _getStatusColor(),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -253,6 +255,7 @@ class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
                     color: _getStatusColor(),
                   ),
                 ),
+
                 if (_currentState != null) ...[
                   const SizedBox(height: 8),
                   Text(
