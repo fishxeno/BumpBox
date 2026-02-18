@@ -238,6 +238,140 @@ class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
       );
     }
 
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isLandscape = constraints.maxWidth > constraints.maxHeight;
+
+        if (isLandscape) {
+          return _buildLandscapeLayout();
+        } else {
+          return _buildPortraitLayout();
+        }
+      },
+    );
+  }
+
+  Widget _buildLandscapeLayout() {
+    return Row(
+      children: [
+        // Camera Preview
+        Expanded(
+          child: Container(
+            color: Colors.black,
+            child: Center(
+              child:
+                  _cameraService.controller != null &&
+                      _cameraService.controller!.value.isInitialized
+                  ? CameraPreview(_cameraService.controller!)
+                  : const Text(
+                      'Camera not available',
+                      style: TextStyle(color: Colors.white),
+                    ),
+            ),
+          ),
+        ),
+
+        // Status Display
+        Expanded(
+          child: Column(
+            children: [
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  color: _getStatusColor().withOpacity(0.1),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Icon(
+                          _getStatusIcon(),
+                          size: 64,
+                          color: _getStatusColor(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _getStatusText(),
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: _getStatusColor(),
+                        ),
+                      ),
+
+                      if (_currentState != null) ...[
+                        if (_currentState!.trackingId != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'ID: ${_currentState!.trackingId}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                        ],
+                        if (_currentState!.details != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            _currentState!.details!,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                        if (_currentState!.status ==
+                            PresenceStatus.tracking) ...[
+                          const SizedBox(height: 12),
+                          LinearProgressIndicator(
+                            value:
+                                _currentState!.presenceDuration.inSeconds /
+                                15.0,
+                            backgroundColor: Colors.grey[300],
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              _getStatusColor(),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              // Control Button
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    onPressed: _toggleMonitoring,
+                    icon: Icon(_isMonitoring ? Icons.stop : Icons.play_arrow),
+                    label: Text(
+                      _isMonitoring
+                          ? '(Price increment: $_priceIncreaseCount) Stop Monitoring'
+                          : 'Start Monitoring',
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isMonitoring
+                          ? Colors.red
+                          : Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPortraitLayout() {
     return Column(
       children: [
         // Camera Preview
