@@ -14,18 +14,27 @@ class AttentionMonitorScreen extends StatefulWidget {
 class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
     with WidgetsBindingObserver {
   final CameraService _cameraService = CameraService();
-  late final AttentionDetector _attentionDetector;
+  late final PersonTracker _personTracker;
 
-  AttentionState? _currentState;
+  PresenceState? _currentState;
   bool _isLoading = true;
   String? _error;
   bool _isMonitoring = false;
+  int _priceIncreaseCount = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _attentionDetector = AttentionDetector();
+    _personTracker = PersonTracker(
+      onPriceIncrease: (trackingId) {
+        setState(() {
+          _priceIncreaseCount++;
+        });
+        debugPrint('💰 Price increased! Total increases: $_priceIncreaseCount');
+        // TODO: Implement actual price increase logic here
+      },
+    );
     _initializeCamera();
   }
 
@@ -34,7 +43,7 @@ class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
     WidgetsBinding.instance.removeObserver(this);
     _stopMonitoring();
     _cameraService.dispose();
-    _attentionDetector.dispose();
+    _personTracker.dispose();
     super.dispose();
   }
 
@@ -95,10 +104,10 @@ class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
       await _cameraService.startImageStream((CameraImage image) async {
         if (!_isMonitoring) return;
 
-        final state = await _attentionDetector.processImage(image);
+        final state = await _personTracker.processImage(image);
 
-        // Only update UI for meaningful states
-        if (state.status != AttentionStatus.unknown && mounted) {
+        // Update UI with current state
+        if (mounted) {
           setState(() {
             _currentState = state;
           });
@@ -117,6 +126,7 @@ class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
       _isMonitoring = false;
     });
     await _cameraService.stopImageStream();
+    _personTracker.reset();
   }
 
   void _toggleMonitoring() {
@@ -131,14 +141,14 @@ class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
     if (_currentState == null) return Colors.grey;
 
     switch (_currentState!.status) {
-      case AttentionStatus.payingAttention:
-        return Colors.green;
-      case AttentionStatus.notPayingAttention:
-        return Colors.orange;
-      case AttentionStatus.noFaceDetected:
-        return Colors.red;
-      case AttentionStatus.unknown:
+      case PresenceStatus.idle:
         return Colors.grey;
+      case PresenceStatus.tracking:
+        return Colors.blue;
+      case PresenceStatus.priceIncreased:
+        return Colors.orange;
+      case PresenceStatus.cooldown:
+        return Colors.purple;
     }
   }
 
@@ -146,14 +156,36 @@ class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
     if (_currentState == null) return 'No data';
 
     switch (_currentState!.status) {
-      case AttentionStatus.payingAttention:
-        return '✓ Paying Attention';
-      case AttentionStatus.notPayingAttention:
-        return '⚠ Not Paying Attention';
-      case AttentionStatus.noFaceDetected:
-        return '✗ No Face Detected';
-      case AttentionStatus.unknown:
-        return '? Unknown';
+      case PresenceStatus.idle:
+        return '⏳ Waiting for Customer';
+      case PresenceStatus.tracking:
+        final seconds = _currentState!.presenceDuration.inSeconds;
+        return '👤 Customer Detected: ${seconds}s';
+      case PresenceStatus.priceIncreased:
+        return '💰 Price Increased!';
+      case PresenceStatus.cooldown:
+        final remaining = _currentState!.remainingCooldown;
+        if (remaining != null) {
+          final minutes = remaining.inMinutes;
+          final seconds = remaining.inSeconds % 60;
+          return '⏰ Cooldown: ${minutes}m ${seconds}s';
+        }
+        return '⏰ Cooldown Active';
+    }
+  }
+
+  IconData _getStatusIcon() {
+    if (_currentState == null) return Icons.help_outline;
+
+    switch (_currentState!.status) {
+      case PresenceStatus.idle:
+        return Icons.person_search;
+      case PresenceStatus.tracking:
+        return Icons.person;
+      case PresenceStatus.priceIncreased:
+        return Icons.attach_money;
+      case PresenceStatus.cooldown:
+        return Icons.timer;
     }
   }
 
@@ -161,8 +193,20 @@ class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Attention Monitor'),
+        title: const Text('Smart Locker Monitor'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          if (_priceIncreaseCount > 0)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'Increases: $_priceIncreaseCount',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+        ],
       ),
       body: _buildBody(),
     );
@@ -239,9 +283,7 @@ class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
               children: [
                 Expanded(
                   child: Icon(
-                    _currentState?.isPayingAttention ?? false
-                        ? Icons.check_circle
-                        : Icons.visibility_off,
+                    _getStatusIcon(),
                     size: 64,
                     color: _getStatusColor(),
                   ),
@@ -257,17 +299,29 @@ class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
                 ),
 
                 if (_currentState != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Confidence: ${(_currentState!.confidence * 100).toStringAsFixed(0)}%',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-                  ),
+                  if (_currentState!.trackingId != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'ID: ${_currentState!.trackingId}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    ),
+                  ],
                   if (_currentState!.details != null) ...[
                     const SizedBox(height: 8),
                     Text(
                       _currentState!.details!,
                       style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       textAlign: TextAlign.center,
+                    ),
+                  ],
+                  if (_currentState!.status == PresenceStatus.tracking) ...[
+                    const SizedBox(height: 12),
+                    LinearProgressIndicator(
+                      value: _currentState!.presenceDuration.inSeconds / 15.0,
+                      backgroundColor: Colors.grey[300],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        _getStatusColor(),
+                      ),
                     ),
                   ],
                 ],

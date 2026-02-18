@@ -6,140 +6,361 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import '../models/attention_state.dart';
 
-class AttentionDetector {
+class PersonTracker {
   final FaceDetector _faceDetector;
   bool _isProcessing = false;
   DateTime? _lastProcessTime;
 
-  // Process frames every 200ms (5 FPS) for efficiency
-  static const _processingInterval = Duration(milliseconds: 200);
+  // Tracking state
+  int? _referenceTrackingId;
+  DateTime? _trackingStartTime;
+  DateTime? _triggeredAt;
+  DateTime? _cooldownStartTime; // When cooldown began
+  DateTime? _cooldownPausedAt; // When cooldown was paused by face detection
+  Duration _cooldownAccumulatedTime =
+      Duration.zero; // Actual cooldown time accumulated
+  DateTime? _lastFaceSeenTime;
+  int? _cooldownTrackingId; // Store tracking ID during cooldown
+  bool _priceIncreased = false;
 
-  AttentionDetector()
+  // Constants
+  static const _processingInterval = Duration(milliseconds: 200);
+  static const _presenceThreshold = Duration(seconds: 15);
+  static const _cooldownDuration = Duration(minutes: 5);
+  static const _absenceGracePeriod = Duration(
+    seconds: 3,
+  ); // Grace period before cooldown
+
+  // Callback for price increase event
+  final void Function(int trackingId)? onPriceIncrease;
+
+  PersonTracker({this.onPriceIncrease})
     : _faceDetector = FaceDetector(
         options: FaceDetectorOptions(
-          enableLandmarks: true,
-          enableClassification: true,
-          enableTracking: true,
+          enableTracking: true, // Essential for tracking same person
+          enableLandmarks: false,
+          enableClassification: false,
           performanceMode: FaceDetectorMode.fast,
         ),
       );
 
-  Future<AttentionState> processImage(CameraImage image) async {
+  Future<PresenceState> processImage(CameraImage image) async {
     // Throttle processing
     final now = DateTime.now();
     if (_lastProcessTime != null &&
         now.difference(_lastProcessTime!) < _processingInterval) {
-      return AttentionState(
-        status: AttentionStatus.unknown,
-        confidence: 0.0,
-        details: 'Throttled',
-      );
+      return _getCurrentState(details: 'Throttled');
     }
 
     if (_isProcessing) {
-      return AttentionState(
-        status: AttentionStatus.unknown,
-        confidence: 0.0,
-        details: 'Processing',
-      );
+      return _getCurrentState(details: 'Processing');
     }
 
     _isProcessing = true;
     _lastProcessTime = now;
 
     try {
+      // Check if cooldown has completed
+      if (_cooldownStartTime != null) {
+        final cooldownRemaining = _getCooldownRemaining();
+        if (cooldownRemaining != null && cooldownRemaining <= Duration.zero) {
+          _resetTracking();
+        }
+      }
+
       final inputImage = _convertCameraImage(image);
       if (inputImage == null) {
-        return AttentionState(
-          status: AttentionStatus.unknown,
-          confidence: 0.0,
-          details: 'Failed to convert image',
-        );
+        return _getCurrentState(details: 'Failed to convert image');
       }
 
       final faces = await _faceDetector.processImage(inputImage);
 
+      // Handle no face detected
       if (faces.isEmpty) {
-        return AttentionState(
-          status: AttentionStatus.noFaceDetected,
-          confidence: 0.0,
-          details: 'No face detected',
-        );
+        return _handleNoFace();
       }
 
-      // Use the first detected face (or largest if multiple)
+      // Use the first detected face
       final face = faces.first;
-      final metrics = _extractFaceMetrics(face);
+      final trackingId = face.trackingId;
 
-      return _determineAttentionState(metrics);
+      if (trackingId == null) {
+        return _getCurrentState(details: 'No tracking ID');
+      }
+
+      return _handleFaceDetected(trackingId, now);
     } catch (e) {
       debugPrint('Error processing image: $e');
-      return AttentionState(
-        status: AttentionStatus.unknown,
-        confidence: 0.0,
-        details: 'Error: $e',
-      );
+      return _getCurrentState(details: 'Error: $e');
     } finally {
       _isProcessing = false;
     }
   }
 
-  FaceMetrics _extractFaceMetrics(Face face) {
-    return FaceMetrics(
-      faceDetected: true,
-      leftEyeOpenProbability: face.leftEyeOpenProbability,
-      rightEyeOpenProbability: face.rightEyeOpenProbability,
-      headPitch: face.headEulerAngleX,
-      headYaw: face.headEulerAngleY,
-      headRoll: face.headEulerAngleZ,
-      faceSize: face.boundingBox.width * face.boundingBox.height,
+  PresenceState _handleNoFace() {
+    final now = DateTime.now();
+
+    // Check if we're in cooldown period - accumulate cooldown time since no face present
+    if (_cooldownStartTime != null) {
+      // If cooldown was paused, resume it
+      if (_cooldownPausedAt != null) {
+        // Resume cooldown - set new start time to now
+        _cooldownStartTime = now;
+        _cooldownPausedAt = null;
+        debugPrint(
+          'Cooldown resumed. Previously accumulated: ${_cooldownAccumulatedTime.inSeconds}s',
+        );
+      }
+
+      // Calculate remaining cooldown
+      final remaining = _getCooldownRemaining();
+
+      if (remaining != null && remaining > Duration.zero) {
+        return PresenceState(
+          status: PresenceStatus.cooldown,
+          trackingId: _cooldownTrackingId,
+          cooldownEndsAt: now.add(remaining),
+          details: 'Cooldown active (no customer)',
+        );
+      } else {
+        // Cooldown complete
+        _resetTracking();
+        return PresenceState(
+          status: PresenceStatus.idle,
+          details: 'Cooldown complete',
+        );
+      }
+    }
+
+    if (_referenceTrackingId != null && !_priceIncreased) {
+      // Person left before 15s threshold
+      _resetTracking();
+      return PresenceState(
+        status: PresenceStatus.idle,
+        details: 'Person left (no price increase)',
+      );
+    } else if (_priceIncreased) {
+      // Person left after price increased - check grace period before cooldown
+      if (_lastFaceSeenTime == null) {
+        // First frame without face after price increase
+        _lastFaceSeenTime = now;
+        return PresenceState(
+          status: PresenceStatus.priceIncreased,
+          trackingId: _referenceTrackingId,
+          triggeredAt: _triggeredAt,
+          details: 'Checking if person left...',
+        );
+      }
+
+      final absenceDuration = now.difference(_lastFaceSeenTime!);
+
+      if (absenceDuration >= _absenceGracePeriod) {
+        // Face has been absent for grace period - start cooldown
+        _cooldownTrackingId = _referenceTrackingId; // Save before clearing
+        _startCooldown();
+
+        final remaining = _getCooldownRemaining();
+        return PresenceState(
+          status: PresenceStatus.cooldown,
+          trackingId: _cooldownTrackingId,
+          cooldownEndsAt: remaining != null ? now.add(remaining) : null,
+          details: 'Person left, cooldown active',
+        );
+      } else {
+        // Still in grace period
+        final remaining = _absenceGracePeriod - absenceDuration;
+        return PresenceState(
+          status: PresenceStatus.priceIncreased,
+          trackingId: _referenceTrackingId,
+          triggeredAt: _triggeredAt,
+          details: 'Face lost (${remaining.inSeconds}s grace period)',
+        );
+      }
+    }
+
+    return PresenceState(
+      status: PresenceStatus.idle,
+      details: 'Waiting for customer',
     );
   }
 
-  AttentionState _determineAttentionState(FaceMetrics metrics) {
-    if (!metrics.faceDetected) {
-      return AttentionState(
-        status: AttentionStatus.noFaceDetected,
-        confidence: 0.0,
-        details: 'No face detected',
+  PresenceState _handleFaceDetected(int trackingId, DateTime now) {
+    // If in cooldown, pause it but don't ignore the face
+    if (_cooldownStartTime != null) {
+      // Pause cooldown - update accumulated time
+      if (_cooldownPausedAt == null) {
+        // Calculate how much time has passed since cooldown started or resumed
+        final elapsed = now.difference(_cooldownStartTime!);
+        _cooldownAccumulatedTime += elapsed;
+        _cooldownPausedAt = now;
+        debugPrint(
+          'Cooldown paused. Accumulated: ${_cooldownAccumulatedTime.inSeconds}s',
+        );
+      }
+
+      final remaining = _getCooldownRemaining();
+      return PresenceState(
+        status: PresenceStatus.cooldown,
+        trackingId: _cooldownTrackingId,
+        cooldownEndsAt: remaining != null ? now.add(remaining) : null,
+        details: 'Cooldown paused (customer present)',
       );
     }
 
-    // Check multiple criteria
-    final eyesOpen = metrics.eyesOpen;
-    final headFacing = metrics.headFacingScreen;
+    // If no reference tracking ID, this is the first person
+    if (_referenceTrackingId == null) {
+      _referenceTrackingId = trackingId;
+      _trackingStartTime = now;
+      _lastFaceSeenTime = null;
+      _priceIncreased = false;
 
-    // Calculate confidence score
-    double confidence = 0.0;
-    final details = <String>[];
-
-    if (eyesOpen) {
-      confidence += 0.6;
-      details.add('Eyes open ✓');
-    } else {
-      details.add('Eyes closed ✗');
+      return PresenceState(
+        status: PresenceStatus.tracking,
+        trackingId: trackingId,
+        presenceDuration: Duration.zero,
+        details: 'Started tracking customer',
+      );
     }
 
-    if (headFacing) {
-      confidence += 0.4;
-      details.add('Head facing screen ✓');
+    // Check if same person
+    if (trackingId == _referenceTrackingId) {
+      // Reset last face seen time since face is detected
+      _lastFaceSeenTime = null;
+
+      final duration = now.difference(_trackingStartTime!);
+
+      // Check if 15s threshold crossed
+      if (!_priceIncreased && duration >= _presenceThreshold) {
+        _priceIncreased = true;
+        _triggeredAt = now;
+
+        // Trigger callback
+        if (onPriceIncrease != null) {
+          onPriceIncrease!(trackingId);
+        }
+
+        return PresenceState(
+          status: PresenceStatus.priceIncreased,
+          trackingId: trackingId,
+          presenceDuration: duration,
+          triggeredAt: _triggeredAt,
+          details: 'Price increased!',
+        );
+      }
+
+      // Still tracking, haven't reached threshold yet
+      return PresenceState(
+        status: _priceIncreased
+            ? PresenceStatus.priceIncreased
+            : PresenceStatus.tracking,
+        trackingId: trackingId,
+        presenceDuration: duration,
+        triggeredAt: _triggeredAt,
+        details: _priceIncreased
+            ? 'Price already increased'
+            : 'Tracking: ${duration.inSeconds}s / ${_presenceThreshold.inSeconds}s',
+      );
     } else {
-      details.add('Head not facing screen ✗');
+      // Different person detected - reset tracking
+      debugPrint(
+        'Different person detected: old=$_referenceTrackingId, new=$trackingId',
+      );
+      _resetTracking();
+
+      // Start tracking new person
+      _referenceTrackingId = trackingId;
+      _trackingStartTime = now;
+      _lastFaceSeenTime = null;
+      _priceIncreased = false;
+
+      return PresenceState(
+        status: PresenceStatus.tracking,
+        trackingId: trackingId,
+        presenceDuration: Duration.zero,
+        details: 'New customer detected',
+      );
+    }
+  }
+
+  void _startCooldown() {
+    _cooldownStartTime = DateTime.now();
+    _cooldownPausedAt = null;
+    _cooldownAccumulatedTime = Duration.zero;
+    debugPrint('Cooldown started at: $_cooldownStartTime');
+
+    // Clear tracking state but keep cooldown timer
+    _referenceTrackingId = null;
+    _trackingStartTime = null;
+    _triggeredAt = null;
+    _lastFaceSeenTime = null;
+    _priceIncreased = false;
+  }
+
+  Duration? _getCooldownRemaining() {
+    if (_cooldownStartTime == null) return null;
+
+    final now = DateTime.now();
+    Duration totalElapsed = _cooldownAccumulatedTime;
+
+    // If not paused, add time since cooldown started/resumed
+    if (_cooldownPausedAt == null) {
+      totalElapsed += now.difference(_cooldownStartTime!);
     }
 
-    // Determine status
-    AttentionStatus status;
-    if (confidence >= 0.8) {
-      status = AttentionStatus.payingAttention;
-    } else {
-      status = AttentionStatus.notPayingAttention;
+    final remaining = _cooldownDuration - totalElapsed;
+    return remaining.isNegative ? Duration.zero : remaining;
+  }
+
+  void _resetTracking() {
+    debugPrint('Resetting tracking (old ID: $_referenceTrackingId)');
+    _referenceTrackingId = null;
+    _trackingStartTime = null;
+    _triggeredAt = null;
+    _cooldownStartTime = null;
+    _cooldownPausedAt = null;
+    _cooldownAccumulatedTime = Duration.zero;
+    _lastFaceSeenTime = null;
+    _cooldownTrackingId = null;
+    _priceIncreased = false;
+  }
+
+  PresenceState _getCurrentState({String? details}) {
+    final now = DateTime.now();
+
+    // Check cooldown
+    if (_cooldownStartTime != null) {
+      final remaining = _getCooldownRemaining();
+      if (remaining != null && remaining > Duration.zero) {
+        return PresenceState(
+          status: PresenceStatus.cooldown,
+          trackingId: _cooldownTrackingId,
+          cooldownEndsAt: now.add(remaining),
+          details: details ?? 'Cooldown active',
+        );
+      }
     }
 
-    return AttentionState(
-      status: status,
-      confidence: confidence,
-      details: details.join(', '),
-    );
+    // If tracking someone
+    if (_referenceTrackingId != null && _trackingStartTime != null) {
+      final duration = now.difference(_trackingStartTime!);
+
+      return PresenceState(
+        status: _priceIncreased
+            ? PresenceStatus.priceIncreased
+            : PresenceStatus.tracking,
+        trackingId: _referenceTrackingId,
+        presenceDuration: duration,
+        triggeredAt: _triggeredAt,
+        details: details,
+      );
+    }
+
+    return PresenceState(status: PresenceStatus.idle, details: details);
+  }
+
+  /// Manually reset tracking (e.g., when monitoring stops)
+  void reset() {
+    _resetTracking();
   }
 
   InputImage? _convertCameraImage(CameraImage image) {
