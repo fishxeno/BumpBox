@@ -33,8 +33,10 @@ class PersonTracker {
 
   // Callback for price increase event
   final void Function(int trackingId)? onPriceIncrease;
+  // Callback for cooldown completion
+  final void Function()? onCooldownComplete;
 
-  PersonTracker({this.onPriceIncrease})
+  PersonTracker({this.onPriceIncrease, this.onCooldownComplete})
     : _faceDetector = FaceDetector(
         options: FaceDetectorOptions(
           enableTracking: true, // Essential for tracking same person
@@ -65,6 +67,9 @@ class PersonTracker {
         final cooldownRemaining = _getCooldownRemaining();
         if (cooldownRemaining != null && cooldownRemaining <= Duration.zero) {
           _resetTracking();
+          if (onCooldownComplete != null) {
+            onCooldownComplete!();
+          }
         }
       }
 
@@ -125,6 +130,9 @@ class PersonTracker {
       } else {
         // Cooldown complete
         _resetTracking();
+        if (onCooldownComplete != null) {
+          onCooldownComplete!();
+        }
         return PresenceState(
           status: PresenceStatus.idle,
           details: 'Cooldown complete',

@@ -34,6 +34,10 @@ class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
         debugPrint('💰 Price increased! Total increases: $_priceIncreaseCount');
         // TODO: Implement actual price increase logic here
       },
+      onCooldownComplete: () {
+        debugPrint('✅ Cooldown completed, ready for next customer');
+        // TODO: Implement cooldown completion logic here (e.g., reset price, notify backend)
+      },
     );
     _initializeCamera();
   }
