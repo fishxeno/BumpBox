@@ -16,9 +16,11 @@ class PersonTracker {
   DateTime? _trackingStartTime;
   DateTime? _triggeredAt;
   DateTime? _cooldownStartTime; // When cooldown began
-  DateTime? _cooldownPausedAt; // When cooldown was paused by face detection
+  DateTime? _cooldownPausedAt; // When cooldown was paused
   Duration _cooldownAccumulatedTime =
-      Duration.zero; // Actual cooldown time accumulated
+      Duration.zero; // Cooldown time accumulated
+  DateTime?
+  _cooldownPauseStartTime; // When person first appeared during cooldown
   DateTime? _lastFaceSeenTime;
   int? _cooldownTrackingId; // Store tracking ID during cooldown
   bool _priceIncreased = false; // Current person triggered price increase
@@ -32,6 +34,9 @@ class PersonTracker {
   static const _absenceGracePeriod = Duration(
     seconds: 3,
   ); // Grace period before cooldown
+  static const _minPauseDuration = Duration(
+    seconds: 3,
+  ); // Minimum presence to pause cooldown
 
   // Callback for price increase event
   final void Function(int trackingId)? onPriceIncrease;
@@ -107,15 +112,17 @@ class PersonTracker {
   PresenceState _handleNoFace() {
     final now = DateTime.now();
 
-    // Check if we're in cooldown period - accumulate cooldown time since no face present
+    // Check if we're in cooldown period
     if (_cooldownStartTime != null) {
+      // Reset the pause start time since no face is present
+      _cooldownPauseStartTime = null;
+
       // If cooldown was paused, resume it
       if (_cooldownPausedAt != null) {
-        // Resume cooldown - set new start time to now
         _cooldownStartTime = now;
         _cooldownPausedAt = null;
         debugPrint(
-          'Cooldown resumed. Previously accumulated: ${_cooldownAccumulatedTime.inSeconds}s',
+          'Cooldown resumed. Accumulated: ${_cooldownAccumulatedTime.inSeconds}s',
         );
       }
 
@@ -210,26 +217,45 @@ class PersonTracker {
   }
 
   PresenceState _handleFaceDetected(int trackingId, DateTime now) {
-    // If in cooldown, pause it but don't ignore the face
+    // If in cooldown, check if should pause based on presence duration
     if (_cooldownStartTime != null) {
-      // Pause cooldown - update accumulated time
-      if (_cooldownPausedAt == null) {
-        // Calculate how much time has passed since cooldown started or resumed
-        final elapsed = now.difference(_cooldownStartTime!);
-        _cooldownAccumulatedTime += elapsed;
-        _cooldownPausedAt = now;
-        debugPrint(
-          'Cooldown paused. Accumulated: ${_cooldownAccumulatedTime.inSeconds}s',
-        );
+      // Track when this person first appeared during cooldown
+      if (_cooldownPauseStartTime == null) {
+        _cooldownPauseStartTime = now;
       }
 
+      final presenceDuration = now.difference(_cooldownPauseStartTime!);
       final remaining = _getCooldownRemaining();
-      return PresenceState(
-        status: PresenceStatus.cooldown,
-        trackingId: _cooldownTrackingId,
-        cooldownEndsAt: remaining != null ? now.add(remaining) : null,
-        details: 'Cooldown paused (customer present)',
-      );
+
+      // Only pause cooldown if person has been present for minimum duration
+      if (presenceDuration >= _minPauseDuration) {
+        // Pause cooldown - update accumulated time
+        if (_cooldownPausedAt == null) {
+          final elapsed = now.difference(_cooldownStartTime!);
+          _cooldownAccumulatedTime += elapsed;
+          _cooldownPausedAt = now;
+          debugPrint(
+            'Cooldown paused after ${presenceDuration.inSeconds}s presence. Accumulated: ${_cooldownAccumulatedTime.inSeconds}s',
+          );
+        }
+
+        return PresenceState(
+          status: PresenceStatus.cooldown,
+          trackingId: _cooldownTrackingId,
+          cooldownEndsAt: remaining != null ? now.add(remaining) : null,
+          details: 'Cooldown paused (customer present)',
+        );
+      } else {
+        // Person present but not long enough to pause yet
+        final timeUntilPause = _minPauseDuration - presenceDuration;
+        return PresenceState(
+          status: PresenceStatus.cooldown,
+          trackingId: _cooldownTrackingId,
+          cooldownEndsAt: remaining != null ? now.add(remaining) : null,
+          details:
+              'Cooldown active (verifying interest: ${timeUntilPause.inSeconds}s)',
+        );
+      }
     }
 
     // If no reference tracking ID, this is the first person
@@ -290,25 +316,43 @@ class PersonTracker {
     } else {
       // Different person detected
 
-      // If we're in cooldown, don't reset - keep cooldown active
+      // If we're in cooldown, treat as any other face (check presence duration)
       if (_cooldownStartTime != null) {
-        // Already in cooldown - pause it and continue
-        if (_cooldownPausedAt == null) {
-          final elapsed = now.difference(_cooldownStartTime!);
-          _cooldownAccumulatedTime += elapsed;
-          _cooldownPausedAt = now;
-          debugPrint(
-            'Different person during cooldown. Cooldown paused. Accumulated: ${_cooldownAccumulatedTime.inSeconds}s',
-          );
+        // Track when this person first appeared during cooldown
+        if (_cooldownPauseStartTime == null) {
+          _cooldownPauseStartTime = now;
         }
 
+        final presenceDuration = now.difference(_cooldownPauseStartTime!);
         final remaining = _getCooldownRemaining();
-        return PresenceState(
-          status: PresenceStatus.cooldown,
-          trackingId: _cooldownTrackingId,
-          cooldownEndsAt: remaining != null ? now.add(remaining) : null,
-          details: 'Cooldown paused (different customer)',
-        );
+
+        // Only pause cooldown if person has been present for minimum duration
+        if (presenceDuration >= _minPauseDuration) {
+          if (_cooldownPausedAt == null) {
+            final elapsed = now.difference(_cooldownStartTime!);
+            _cooldownAccumulatedTime += elapsed;
+            _cooldownPausedAt = now;
+            debugPrint(
+              'Cooldown paused by different person after ${presenceDuration.inSeconds}s. Accumulated: ${_cooldownAccumulatedTime.inSeconds}s',
+            );
+          }
+
+          return PresenceState(
+            status: PresenceStatus.cooldown,
+            trackingId: _cooldownTrackingId,
+            cooldownEndsAt: remaining != null ? now.add(remaining) : null,
+            details: 'Cooldown paused (different customer)',
+          );
+        } else {
+          final timeUntilPause = _minPauseDuration - presenceDuration;
+          return PresenceState(
+            status: PresenceStatus.cooldown,
+            trackingId: _cooldownTrackingId,
+            cooldownEndsAt: remaining != null ? now.add(remaining) : null,
+            details:
+                'Cooldown active (verifying interest: ${timeUntilPause.inSeconds}s)',
+          );
+        }
       }
 
       // If price was increased for current person, reset and track new person
@@ -349,6 +393,7 @@ class PersonTracker {
     _cooldownStartTime = DateTime.now();
     _cooldownPausedAt = null;
     _cooldownAccumulatedTime = Duration.zero;
+    _cooldownPauseStartTime = null;
     debugPrint('Cooldown started at: $_cooldownStartTime');
 
     // Clear tracking state but keep cooldown timer
@@ -382,6 +427,7 @@ class PersonTracker {
     _cooldownStartTime = null;
     _cooldownPausedAt = null;
     _cooldownAccumulatedTime = Duration.zero;
+    _cooldownPauseStartTime = null;
     _lastFaceSeenTime = null;
     _cooldownTrackingId = null;
     _priceIncreased = false;
