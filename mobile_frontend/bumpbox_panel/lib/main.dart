@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/attention_monitor_screen.dart';
+import 'screens/kiosk_dashboard_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -11,12 +11,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'BumpBox Smart Locker Monitor',
+      title: 'BumpBox Kiosk',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const AttentionMonitorScreen(),
+      home: const KioskDashboardScreen(),
     );
   }
 }
