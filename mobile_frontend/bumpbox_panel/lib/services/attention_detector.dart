@@ -382,13 +382,6 @@ class PersonTracker {
 
       final imageSize = Size(image.width.toDouble(), image.height.toDouble());
 
-      // Platform-specific rotation
-      // Android front camera: 270 degrees (portrait mode)
-      // iOS front camera: 0 degrees (native orientation)
-      final InputImageRotation imageRotation = Platform.isAndroid
-          ? InputImageRotation.rotation270deg
-          : InputImageRotation.rotation0deg;
-
       final inputImageFormat = InputImageFormatValue.fromRawValue(
         image.format.raw,
       );
@@ -399,7 +392,7 @@ class PersonTracker {
 
       final inputImageData = InputImageMetadata(
         size: imageSize,
-        rotation: imageRotation,
+        rotation: InputImageRotation.rotation0deg,
         format: inputImageFormat,
         bytesPerRow: image.planes.first.bytesPerRow,
       );
