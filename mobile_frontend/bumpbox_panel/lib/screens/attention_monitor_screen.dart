@@ -35,6 +35,7 @@ class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
         // TODO: Implement actual price increase logic here
       },
       onCooldownComplete: () {
+        _priceIncreaseCount = 0;
         debugPrint('✅ Cooldown completed, ready for next customer');
         // TODO: Implement cooldown completion logic here (e.g., reset price, notify backend)
       },
@@ -326,7 +327,9 @@ class _AttentionMonitorScreenState extends State<AttentionMonitorScreen>
               onPressed: _toggleMonitoring,
               icon: Icon(_isMonitoring ? Icons.stop : Icons.play_arrow),
               label: Text(
-                _isMonitoring ? 'Stop Monitoring' : 'Start Monitoring',
+                _isMonitoring
+                    ? '(Price increment: $_priceIncreaseCount) Stop Monitoring'
+                    : 'Start Monitoring',
                 style: const TextStyle(fontSize: 18),
               ),
               style: ElevatedButton.styleFrom(

@@ -21,12 +21,14 @@ class PersonTracker {
       Duration.zero; // Actual cooldown time accumulated
   DateTime? _lastFaceSeenTime;
   int? _cooldownTrackingId; // Store tracking ID during cooldown
-  bool _priceIncreased = false;
+  bool _priceIncreased = false; // Current person triggered price increase
+  bool _anyPriceIncreaseOccurred =
+      false; // Any person triggered increase (for cooldown)
 
   // Constants
   static const _processingInterval = Duration(milliseconds: 200);
-  static const _presenceThreshold = Duration(seconds: 15);
-  static const _cooldownDuration = Duration(minutes: 5);
+  static const _presenceThreshold = Duration(seconds: 5);
+  static const _cooldownDuration = Duration(seconds: 5);
   static const _absenceGracePeriod = Duration(
     seconds: 3,
   ); // Grace period before cooldown
@@ -141,13 +143,28 @@ class PersonTracker {
     }
 
     if (_referenceTrackingId != null && !_priceIncreased) {
-      // Person left before 15s threshold
+      // Person left before threshold
+      if (_anyPriceIncreaseOccurred) {
+        // A previous person triggered a price increase, so start cooldown
+        _cooldownTrackingId = _referenceTrackingId;
+        _startCooldown();
+
+        final remaining = _getCooldownRemaining();
+        return PresenceState(
+          status: PresenceStatus.cooldown,
+          trackingId: _cooldownTrackingId,
+          cooldownEndsAt: remaining != null ? now.add(remaining) : null,
+          details: 'Person left, cooldown started',
+        );
+      }
+
+      // No price increase occurred at all, just reset
       _resetTracking();
       return PresenceState(
         status: PresenceStatus.idle,
         details: 'Person left (no price increase)',
       );
-    } else if (_priceIncreased) {
+    } else if (_anyPriceIncreaseOccurred) {
       // Person left after price increased - check grace period before cooldown
       if (_lastFaceSeenTime == null) {
         // First frame without face after price increase
@@ -240,6 +257,8 @@ class PersonTracker {
       // Check if 15s threshold crossed
       if (!_priceIncreased && duration >= _presenceThreshold) {
         _priceIncreased = true;
+        _anyPriceIncreaseOccurred =
+            true; // Mark that at least one increase happened
         _triggeredAt = now;
 
         // Trigger callback
@@ -269,11 +288,47 @@ class PersonTracker {
             : 'Tracking: ${duration.inSeconds}s / ${_presenceThreshold.inSeconds}s',
       );
     } else {
-      // Different person detected - reset tracking
+      // Different person detected
+
+      // If we're in cooldown, don't reset - keep cooldown active
+      if (_cooldownStartTime != null) {
+        // Already in cooldown - pause it and continue
+        if (_cooldownPausedAt == null) {
+          final elapsed = now.difference(_cooldownStartTime!);
+          _cooldownAccumulatedTime += elapsed;
+          _cooldownPausedAt = now;
+          debugPrint(
+            'Different person during cooldown. Cooldown paused. Accumulated: ${_cooldownAccumulatedTime.inSeconds}s',
+          );
+        }
+
+        final remaining = _getCooldownRemaining();
+        return PresenceState(
+          status: PresenceStatus.cooldown,
+          trackingId: _cooldownTrackingId,
+          cooldownEndsAt: remaining != null ? now.add(remaining) : null,
+          details: 'Cooldown paused (different customer)',
+        );
+      }
+
+      // If price was increased for current person, reset and track new person
+      // This allows stacking price increases from multiple people
+      if (_priceIncreased) {
+        debugPrint(
+          'Different person detected after price increase. Resetting to track new person.',
+        );
+      }
+
+      // Reset and track new person (allows stacking)
       debugPrint(
         'Different person detected: old=$_referenceTrackingId, new=$trackingId',
       );
+
+      // Save the price increase flag before resetting
+      final preserveAnyIncrease = _anyPriceIncreaseOccurred;
       _resetTracking();
+      // Restore the flag - we only fully reset after cooldown completes
+      _anyPriceIncreaseOccurred = preserveAnyIncrease;
 
       // Start tracking new person
       _referenceTrackingId = trackingId;
@@ -330,6 +385,7 @@ class PersonTracker {
     _lastFaceSeenTime = null;
     _cooldownTrackingId = null;
     _priceIncreased = false;
+    _anyPriceIncreaseOccurred = false; // Reset global flag
   }
 
   PresenceState _getCurrentState({String? details}) {
