@@ -312,23 +312,32 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _itemName,
-                        style: TextStyle(
-                          fontSize: 56,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey.shade900,
-                          letterSpacing: -1.5,
-                          height: 1.1,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _itemDescription,
-                        style: TextStyle(
-                          fontSize: 28,
-                          color: Colors.grey.shade700,
-                          height: 1.5,
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            FittedBox(
+                              child: Text(
+                                _itemName,
+                                style: TextStyle(
+                                  fontSize: 56,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey.shade900,
+                                  letterSpacing: -1.5,
+                                  height: 1.1,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              _itemDescription,
+                              style: TextStyle(
+                                fontSize: 28,
+                                color: Colors.grey.shade700,
+                                height: 1.5,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       if (_priceIncreaseCount > 0) ...[
