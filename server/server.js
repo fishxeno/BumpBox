@@ -77,7 +77,7 @@ function addDaysAndFormat(days, baseDate = new Date()) {
 app.post('/api/item', async (req, res) => {
     try {
             const product = await stripe.products.create({
-                name: req.body.itemname,
+                name: req.body.item_name,
                 description: req.body.description,
                 default_price_data: {
                     unit_amount: Math.round(req.body.price * 100), // Convert to cents
@@ -97,7 +97,7 @@ app.post('/api/item', async (req, res) => {
             const query = `INSERT INTO items (userid, item_name, price, productid, priceid, datetime_expire, paymentLink) VALUES (?, ?, ?, ?, ?, ?, ?)`;
             const [rows] = await db.execute(query, [
                 itemData.userId,
-                itemData.itemname,
+                itemData.item_name,
                 itemData.price,
                 product.id,
                 product.default_price,
