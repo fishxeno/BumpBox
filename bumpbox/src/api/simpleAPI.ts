@@ -9,6 +9,24 @@ import {
     type Updater,
 } from "@tanstack/react-query";
 
+
+function isLocalhost() {
+  if (typeof window === "undefined") return false;
+
+  const host = window.location.hostname;
+
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "[::1]"
+  );
+}
+
+if (isLocalhost()) {
+  axios.defaults.baseURL = "http://localhost:8080";
+}
+
+
 /* ---------------------------------- */
 /* Custom Error */
 /* ---------------------------------- */

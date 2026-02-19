@@ -4,6 +4,7 @@ import { resolve, join } from 'path';
 import methodOverride from 'method-override';
 import db from './dbConnection.js';
 import Stripe from 'stripe';
+import cors from 'cors';
 
 const app = express();
 const __dirname = resolve();
@@ -27,7 +28,14 @@ app.post('/webhook', raw({ type: 'application/json' }), (req, res) => {
   	console.log(req.rawBody);
   	res.sendStatus(200);
 });
-
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:8080",
+    ],
+  })
+);
 app.use(json());
 app.use(urlencoded({ extended: true }));
 app.use(methodOverride());
@@ -96,7 +104,7 @@ app.post('/api/item', async (req, res) => {
             const itemData = req.body;
             const query = `INSERT INTO items (userid, item_name, price, productid, priceid, datetime_expire, paymentLink) VALUES (?, ?, ?, ?, ?, ?, ?)`;
             const [rows] = await db.execute(query, [
-                itemData.userId,
+                itemData.userId ?? 1,
                 itemData.item_name,
                 itemData.price,
                 product.id,

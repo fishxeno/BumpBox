@@ -33,7 +33,7 @@ export function useItemMutations<Key extends keyof typeof itemMutations>(
 
 export const itemMutations = {
   CREATE_ITEM: (item: CreateItemInterface) => ({
-    url: "/items",
+    url: "/api/item",
     method: "POST",
     requestBody: item,
   }) satisfies BumpMutationOptions<any, CreateItemInterface>,
