@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express, { raw, json, urlencoded, static as expressStatic } from 'express';
 import { resolve, join } from 'path';
 import methodOverride from 'method-override';
+import detectObjectRouter from './routes/detectObject.js';
 import db from './dbConnection.js';
 import Stripe from 'stripe';
 import cors from 'cors';
@@ -39,6 +40,7 @@ app.use(
 app.use(json());
 app.use(urlencoded({ extended: true }));
 app.use(methodOverride());
+app.use(detectObjectRouter);
 
 //for esp polling
 app.get('/api/item/status', async (req, res) => {
