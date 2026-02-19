@@ -494,7 +494,7 @@ class PersonTracker {
 
       final inputImageData = InputImageMetadata(
         size: imageSize,
-        rotation: InputImageRotation.rotation0deg,
+        rotation: InputImageRotation.rotation270deg,
         format: inputImageFormat,
         bytesPerRow: image.planes.first.bytesPerRow,
       );
