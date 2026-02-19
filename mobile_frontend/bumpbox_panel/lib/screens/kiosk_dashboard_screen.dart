@@ -731,13 +731,15 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
   }
 
   Widget _buildPortraitLayout() {
-    return Center(
+    return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(32.0),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            const SizedBox(height: 16),
+
             // Availability Status
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -763,30 +765,35 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
               ),
             ),
 
-            const SizedBox(height: 48),
+            const SizedBox(height: 32),
 
             // Item Name
             Text(
               _currentItem.name,
               textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 48,
+                fontSize: 40,
                 fontWeight: FontWeight.bold,
                 color: Colors.grey.shade900,
                 letterSpacing: -1,
+                height: 1.1,
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
             // Item Description
             Text(
               _currentItem.description,
               textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 24,
+                fontSize: 18,
                 color: Colors.grey.shade700,
-                height: 1.4,
+                height: 1.3,
               ),
             ),
 
@@ -798,6 +805,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
               decoration: BoxDecoration(
                 color: Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade200, width: 1),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -809,107 +817,109 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.blue.shade900,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 64),
+            const SizedBox(height: 24),
 
             // Price Display
-            Flexible(
-              child: GestureDetector(
-                onLongPress: _navigateToDebugScreen,
-                child: Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 20,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Current Price',
-                        style: TextStyle(
-                          fontSize: 20,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      AnimatedDefaultTextStyle(
-                        duration: const Duration(milliseconds: 300),
-                        style: TextStyle(
-                          fontSize: 72,
-                          fontWeight: FontWeight.bold,
-                          color: _getPriceColor(),
-                          letterSpacing: -2,
-                        ),
-                        child: Text(PricingConfig.formatPrice(_currentPrice)),
-                      ),
-                      const SizedBox(height: 16),
-                      // Price details
-                      Text(
-                        'Decay: ${PricingConfig.formatPrice(_currentDecayPrice)}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      if (_surgeCount > 0) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _getSurgeBadgeIcon(),
-                              size: 14,
-                              color: _getSurgeBadgeColor(),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Surge: +${PricingConfig.formatPrice(_currentPrice - _currentDecayPrice)}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: _getSurgeBadgeColor(),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+            Expanded(
+              child: Center(
+                child: GestureDetector(
+                  onLongPress: _navigateToDebugScreen,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 20,
+                          offset: const Offset(0, 4),
                         ),
                       ],
-                      const SizedBox(height: 8),
-                      Text(
-                        'Floor: ${PricingConfig.formatPrice(_currentItem.floorPrice)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade500,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Current Price',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 300),
+                          style: TextStyle(
+                            fontSize: 64,
+                            fontWeight: FontWeight.bold,
+                            color: _getPriceColor(),
+                            letterSpacing: -2,
+                          ),
+                          child: Text(PricingConfig.formatPrice(_currentPrice)),
+                        ),
+                        const SizedBox(height: 12),
+                        // Price details
+                        Text(
+                          'Decay: ${PricingConfig.formatPrice(_currentDecayPrice)}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        if (_surgeCount > 0) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _getSurgeBadgeIcon(),
+                                size: 13,
+                                color: _getSurgeBadgeColor(),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Surge: +${PricingConfig.formatPrice(_currentPrice - _currentDecayPrice)}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: _getSurgeBadgeColor(),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        Text(
+                          'Floor: ${PricingConfig.formatPrice(_currentItem.floorPrice)}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
 
-            const SizedBox(height: 32),
-
             // Additional info during price increase
-            if (_surgeCount > 0)
+            if (_surgeCount > 0) ...[
+              const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
+                  horizontal: 20,
+                  vertical: 12,
                 ),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade50,
@@ -920,22 +930,26 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons.trending_up,
-                      color: Colors.orange.shade700,
-                      size: 24,
+                      _getSurgeBadgeIcon(),
+                      color: _getSurgeBadgeColor(),
+                      size: 20,
                     ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'High demand pricing in effect',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.orange.shade900,
-                        fontWeight: FontWeight.w500,
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'High demand pricing',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.orange.shade900,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
+            ],
+            const SizedBox(height: 16),
           ],
         ),
       ),
