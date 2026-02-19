@@ -2,7 +2,7 @@
 
 | **Project Name** | Bumpbox |
 | :--- | :--- |
-| **Version** | **1.0** |
+| **Version** | **1.1** |
 | **Status** | Draft |
 | **Context** | Smart Second-hand Marketplace Lockers (MRT/Business Park focus) |
 
@@ -28,8 +28,16 @@ Bumpbox is a smart vending locker system designed to automate the sale of second
 ## 3. Functional Requirements
 
 ### 3.1 Dynamic Pricing Engine
-The system must autonomously adjust pricing to maximize conversion while respecting seller limits. The pricing logic is driven by both time decay and real-time interest (Physical & Digital).
+The system must autonomously adjust pricing to maximize conversion while respecting seller limits. The pricing logic is driven by automated condition assessment, time decay, and real-time interest (Physical & Digital).
 
+*   **Automated Condition-Based Pricing (Initial Layer):** 
+    *   Upon item deposit, the system uses **computer vision (object detection and condition assessment)** and **weight sensors** to automatically evaluate the item.
+    *   **Factors Analyzed:**
+        1.  **Object Recognition:** AI identifies the product category, brand, and model to establish market baseline.
+        2.  **Condition Assessment:** Camera detects scratches, wear, discoloration, and overall cosmetic condition.
+        3.  **Weight/Density Verification:** Sensors confirm item authenticity and completeness (e.g., checking if accessories are included).
+    *   **Initial Price Calculation:** The system generates a recommended starting price based on condition grade (Excellent/Good/Fair/Poor), which is balanced against the seller's floor price.
+    *   Items in better condition automatically receive higher initial pricing within the acceptable range.
 *   **Time-Decay Pricing (Base Layer):** The price decreases gradually over the listing period (up to 7 days) to ensure inventory turnover.
 *   **Interest-Based Surge Pricing (FOMO Layer):**
     *   **Triggers:**
