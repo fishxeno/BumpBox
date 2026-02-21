@@ -102,9 +102,9 @@ app.post('/api/item', async (req, res) => {
                 ],
             });
             const itemData = req.body;
-            const query = `INSERT INTO items (userid, item_name, price, productid, priceid, datetime_expire, paymentLink) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+            const query = `INSERT INTO items (phone, item_name, price, productid, priceid, datetime_expire, paymentLink) VALUES (?, ?, ?, ?, ?, ?, ?)`;
             const [rows] = await db.execute(query, [
-                itemData.userId ?? 1,
+                itemData.phone,
                 itemData.item_name,
                 itemData.price,
                 product.id,

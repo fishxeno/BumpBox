@@ -15,6 +15,7 @@ export function useItem(itemId: number) {
 }
 
 interface CreateItemInterface {
+    phone: string;
     item_name: string;
     price: number;
     description: string;
