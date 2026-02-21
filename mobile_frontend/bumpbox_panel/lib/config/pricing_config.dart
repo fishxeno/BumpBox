@@ -14,7 +14,7 @@ class PricingConfig {
 
   /// Exponential decay base calculated from half-life
   /// Formula: decayBase = 0.5^(1/halfLife)
-  static final double decayBase = pow(0.5, 1.0 / decayHalfLifeHours).toDouble();
+  static final double decayBase = pow(0.2, 1.0 / decayHalfLifeHours).toDouble();
 
   /// How often to recalculate decay price (in seconds)
   static const Duration decayUpdateInterval = Duration(seconds: 10);

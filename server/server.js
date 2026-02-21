@@ -16,14 +16,6 @@ app.set('trust proxy', true);
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-const createCustomer = async (req, res) => {
-    const data = req.body;
-    const customer = await stripe.customers.create({
-        email: data.email,
-    });
-    return customer.id;
-}
-
 //webhook endpoint for stripe
 //update item to sold when payment is successful
 app.post('/webhook', raw({ type: 'application/json' }), (req, res) => {
@@ -184,6 +176,21 @@ function addDaysAndFormat(days, baseDate = new Date()) {
   );
 }
 
+//capture payment endpoint
+app.post('/api/capture', async (req, res) => {
+    try {
+        const paymentIntentId = req.body.paymentIntentId;
+        const paymentIntent = await stripe.paymentIntents.capture(paymentIntentId);
+        const query = `UPDATE item SET sale_status = 0 WHERE priceid = ?`;
+        const [rows] = await db.execute(query, [paymentIntent.payment_method]);
+        return res.status(200).json({ message: 'Payment captured successfully', data: rows });
+    }
+    catch (error) {
+        console.error('Capture payment error:', error.stack);
+        return res.status(500).json({ error: 'Error capturing payment' });
+    }
+});
+
 //create new item endpoint
 app.post('/api/item', async (req, res) => {
     try {
@@ -197,6 +204,7 @@ app.post('/api/item', async (req, res) => {
             });
 
             const paymentLink = await stripe.paymentLinks.create({
+                capture_method: 'manual',
                 line_items: [
                     {
                         price: product.default_price,
@@ -220,6 +228,19 @@ app.post('/api/item', async (req, res) => {
             console.error('Create new item error:', error.stack);
             throw new Error('500', 'Error creating new item');
         }
+});
+
+// Endpoint to edit price of latest item
+app.put('/api/item/price', async (req, res) => {
+    try {
+        const query = `UPDATE item SET price = ? WHERE itemid = (SELECT itemid FROM item ORDER BY itemid DESC LIMIT 1)`;
+        const [rows] = await db.execute(query, [req.body.price]);
+        return res.status(200).json({ items: rows });
+    }
+    catch (error) {
+        console.error('Update item error:', error.stack);
+        return res.status(500).json({ error: 'Error updating item' });
+    }
 });
 
 // Start the server
