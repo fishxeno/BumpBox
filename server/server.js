@@ -6,7 +6,7 @@ import detectObjectRouter from './routes/detectObject.js';
 import db from './dbConnection.js';
 import Stripe from 'stripe';
 import cors from 'cors';
-import { setCaptureTrigger, getAndResetCaptureTrigger, getLatestDetection } from './storage.js';
+import { setCaptureTrigger, getAndResetCaptureTrigger, getLatestDetection, storeDetection } from './storage.js';
 
 const app = express();
 const __dirname = resolve();
