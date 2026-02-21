@@ -43,6 +43,9 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
   Timer? _priceDecayTimer;
   Timer? _onlineInterestTimer;
 
+  // Testing: Time offset for fast-forwarding
+  int _daysFastForwarded = 0;
+
   @override
   void initState() {
     super.initState();
@@ -162,9 +165,14 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
     }
   }
 
+  /// Get effective current time (with testing offset)
+  DateTime _getEffectiveNow() {
+    return DateTime.now().add(Duration(days: _daysFastForwarded));
+  }
+
   /// Update both decay price and final price
   void _updatePrices() {
-    final now = DateTime.now();
+    final now = _getEffectiveNow();
     _currentDecayPrice = PricingService.calculateTimeDecayPrice(
       _currentItem,
       now,
@@ -175,6 +183,22 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
       now,
     );
     StorageService.saveLastPriceUpdate(now); // Persist update time
+  }
+
+  /// Fast forward time for testing (adds 1 day)
+  void _fastForwardOneDay() {
+    setState(() {
+      _daysFastForwarded++;
+      _updatePrices();
+    });
+    debugPrint('⏩ Fast forwarded to +$_daysFastForwarded days');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('⏩ Fast forwarded to +$_daysFastForwarded days'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: Colors.orange.shade700,
+      ),
+    );
   }
 
   /// Load item and surge counts from storage, or create new from mock
@@ -266,7 +290,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
   Color _getPriceColor() {
     if (_surgeCount == 0) {
       // No surge, show decay-based color
-      final progress = _currentItem.getListingProgress(DateTime.now());
+      final progress = _currentItem.getListingProgress(_getEffectiveNow());
       if (progress < 0.3) {
         return Colors.blue.shade700; // Early days, still expensive
       } else if (progress < 0.7) {
@@ -346,7 +370,18 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(backgroundColor: Colors.grey.shade100, body: _buildBody());
+    return Scaffold(
+      backgroundColor: Colors.grey.shade100,
+      body: _buildBody(),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _fastForwardOneDay,
+        icon: const Icon(Icons.fast_forward),
+        label: Text(_daysFastForwarded > 0 ? '+$_daysFastForwarded d' : 'FF'),
+        backgroundColor: Colors.orange.shade600,
+        foregroundColor: Colors.white,
+        tooltip: 'Fast Forward 1 Day (Testing)',
+      ),
+    );
   }
 
   Widget _buildBody() {
@@ -516,7 +551,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                                   const SizedBox(width: 8),
                                   Text(
                                     _currentItem.formatTimeRemaining(
-                                      DateTime.now(),
+                                      _getEffectiveNow(),
                                     ),
                                     style: TextStyle(
                                       fontSize: 16,
@@ -813,7 +848,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                   Icon(Icons.schedule, color: Colors.blue.shade700, size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    _currentItem.formatTimeRemaining(DateTime.now()),
+                    _currentItem.formatTimeRemaining(_getEffectiveNow()),
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.blue.shade900,
