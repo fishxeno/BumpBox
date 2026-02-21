@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { detectLabels, detectLabelsMock } from '../services/visionService.js';
 import { estimatePrice } from '../services/pricingService.js';
+import { storeDetection } from '../storage.js';
 
 const router = Router();
 
@@ -33,15 +34,21 @@ router.post('/detect-object', upload.single('image'), async (req, res) => {
 
     console.log(`[detect-object] Detected: ${priceEstimate.label} (${priceEstimate.confidence}%) | ${priceEstimate.category} | $${priceEstimate.minPrice}-$${priceEstimate.maxPrice}`);
 
+    const detection = {
+      label: priceEstimate.label,
+      category: priceEstimate.category,
+      minPrice: priceEstimate.minPrice,
+      maxPrice: priceEstimate.maxPrice,
+      confidence: priceEstimate.confidence,
+    };
+
+    // Store detection result for Flutter app polling
+    const lockerId = req.query.lockerId || req.body.lockerId || 'locker1';
+    storeDetection(detection, lockerId);
+
     return res.status(200).json({
       success: true,
-      detection: {
-        label: priceEstimate.label,
-        category: priceEstimate.category,
-        minPrice: priceEstimate.minPrice,
-        maxPrice: priceEstimate.maxPrice,
-        confidence: priceEstimate.confidence,
-      },
+      detection,
       allLabels: labels.map(l => ({ description: l.description, score: l.score })),
     });
   } catch (error) {
