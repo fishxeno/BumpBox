@@ -1,66 +1,44 @@
-enum AttentionStatus {
-  payingAttention,
-  notPayingAttention,
-  noFaceDetected,
-  unknown,
+enum PresenceStatus {
+  idle, // No person detected, waiting
+  tracking, // Person detected and being tracked
+  priceIncreased, // 15s threshold crossed, price increased
+  cooldown, // Person left, in 5-minute cooldown
 }
 
-class AttentionState {
-  final AttentionStatus status;
-  final double confidence;
+class PresenceState {
+  final PresenceStatus status;
+  final int? trackingId;
+  final Duration presenceDuration;
+  final DateTime? triggeredAt;
+  final DateTime? cooldownEndsAt;
   final String? details;
   final DateTime timestamp;
 
-  AttentionState({
+  PresenceState({
     required this.status,
-    required this.confidence,
+    this.trackingId,
+    Duration? presenceDuration,
+    this.triggeredAt,
+    this.cooldownEndsAt,
     this.details,
     DateTime? timestamp,
-  }) : timestamp = timestamp ?? DateTime.now();
+  }) : presenceDuration = presenceDuration ?? Duration.zero,
+       timestamp = timestamp ?? DateTime.now();
 
-  bool get isPayingAttention => status == AttentionStatus.payingAttention;
+  bool get isPriceIncreased => status == PresenceStatus.priceIncreased;
+  bool get isTracking => status == PresenceStatus.tracking;
+  bool get isInCooldown => status == PresenceStatus.cooldown;
+  bool get isIdle => status == PresenceStatus.idle;
 
-  @override
-  String toString() {
-    return 'AttentionState(status: $status, confidence: ${confidence.toStringAsFixed(2)}, details: $details)';
-  }
-}
-
-class FaceMetrics {
-  final bool faceDetected;
-  final double? leftEyeOpenProbability;
-  final double? rightEyeOpenProbability;
-  final double? headPitch;
-  final double? headYaw;
-  final double? headRoll;
-  final double? faceSize;
-
-  FaceMetrics({
-    required this.faceDetected,
-    this.leftEyeOpenProbability,
-    this.rightEyeOpenProbability,
-    this.headPitch,
-    this.headYaw,
-    this.headRoll,
-    this.faceSize,
-  });
-
-  bool get eyesOpen {
-    if (leftEyeOpenProbability == null || rightEyeOpenProbability == null) {
-      return false;
-    }
-    return (leftEyeOpenProbability! > 0.8 && rightEyeOpenProbability! > 0.8);
-  }
-
-  bool get headFacingScreen {
-    if (headPitch == null || headYaw == null) return false;
-    return (headPitch!.abs() < 20 && headYaw!.abs() < 30);
+  Duration? get remainingCooldown {
+    if (cooldownEndsAt == null) return null;
+    final remaining = cooldownEndsAt!.difference(DateTime.now());
+    return remaining.isNegative ? Duration.zero : remaining;
   }
 
   @override
   String toString() {
-    return 'FaceMetrics(detected: $faceDetected, leftEye: ${leftEyeOpenProbability?.toStringAsFixed(2)}, '
-        'rightEye: ${rightEyeOpenProbability?.toStringAsFixed(2)}, '
-        'pitch: ${headPitch?.toStringAsFixed(1)}°, yaw: ${headYaw?.toStringAsFixed(1)}°)';
+    return 'PresenceState(status: $status, trackingId: $trackingId, '
+        'duration: ${presenceDuration.inSeconds}s, details: $details)';
   }
 }
