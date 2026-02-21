@@ -1,0 +1,173 @@
+.imgButtonContainer {
+    margin-bottom: 0;
+    border-radius: 50%;
+    padding: 0.2em;
+}
+
+.imgButton {
+    cursor: pointer;
+}
+
+button.icon.border {
+    border: 1px solid var(--bs-gray-400);
+}
+button.icon.transparentIcon.border > svg,
+button.icon.transparentIcon.border {
+    color: var(--bs-gray-500);
+}
+button.icon.transparentIcon {
+    background-color: transparent;
+}
+button.icon.transparentIcon:hover,
+button.icon.transparentIcon:focus-within {
+    background-color: var(--bs-gray-200);
+}
+
+button.icon {
+    transition: all 0.2s ease-in;
+    cursor: pointer;
+    background-color: var(--primary);
+    color: var(--white);
+}
+button.icon:hover,
+button.icon:focus-within {
+    color: var(--white);
+    opacity: 0.7;
+}
+button.icon:active {
+    opacity: 0.5;
+}
+button:disabled {
+    pointer-events: none;
+}
+
+/* bootstrap carousel */
+.carousel .item:hover {
+    opacity: 0.95;
+    transition: opacity 0.1s ease-in-out;
+}
+.carousel .counter {
+    background-color: rgba(0,0,0, 0.65);
+    border-radius: 8px;
+    padding: 0.25rem 1rem;
+}
+.carousel .counter > span {
+    color: white;
+    font-size: 14px;
+}
+
+.carousel .imageContainer {
+    background-color: var(--bs-gray-900);
+}
+:global(.modal) .carousel .imageContainer img {
+    object-fit: contain;
+}
+.carousel .imageContainer img {
+    object-fit: cover;
+}
+
+/* bootstrap table */
+.tableHeaderIcon {
+    animation: hide 200ms linear;
+    animation-fill-mode: forwards;
+}
+.tableHeader:hover .tableHeaderIcon {
+    animation: show 200ms linear;
+    animation-fill-mode: forwards;
+}
+@keyframes show {
+    0% {
+        display: none;
+        opacity: 0;
+    }
+    1% {
+        display: block;
+    }
+    100% {
+        display: block;
+        opacity: 1;
+    }
+}
+@keyframes hide {
+    0% {
+        display: block;
+        opacity: 1;
+    }
+    99% {
+        display: block;
+    }
+    100% {
+        display: none;
+        opacity: 0;
+    }
+}
+
+/* Sidebar */
+.sidebarItem {
+    height: 40px;
+    color: var(--bs-gray-600) !important;
+}
+.sidebarItem.active {
+    color: var(--primary) !important;
+}
+
+button.sidebarItem {
+    width: 100%;
+    justify-content: start !important;
+}
+button.sidebarItem:hover,
+button.sidebarItem:focus,
+button.sidebarItem:focus-within {
+    opacity: 1;
+    box-shadow: none;
+}
+button.sidebarItem > span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* toast */
+.toastContainer {
+    position: fixed;
+    top: 74px;
+    right: 0;
+    z-index: 10;
+}
+
+/* line clamp */
+.lineClamp {
+    display: block;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+}
+
+/* user dropdown */
+.dropdownMenu {
+    max-height: 300px;
+    overflow: auto;
+}
+
+/* + card */
+.plusCard:hover {
+    background-color: var(--grey-lighter);
+}
+
+/* space select */
+.selectToggle {
+    position: relative;
+    display: flex;
+    flex-flow: row nowrap;
+    padding: 10px !important;
+    width: 100%;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.selectToggle::before, .selectToggle::after {
+    content: '';  /* Insert pseudo-element */
+    margin: auto; /* Make it push flex items to the center */
+  }

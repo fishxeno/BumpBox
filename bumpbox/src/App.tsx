@@ -1,35 +1,140 @@
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { Button, Modal, Form, Container, Col } from "react-bootstrap";
+import "./App.css";
+import React from "react";
+import { Formik } from "formik";
+import * as Yup from "yup";
+import { Close, Done } from "@mui/icons-material";
+import BootstrapModalFooter from "./utils/BootstrapModalFooter";
+import { useItemMutations } from "./api/itemService";
+import { BootstrapInput } from "./utils/components/FormikBootstrapinputs";
 
 function App() {
-  
+    const [showModal, setShowModal] = React.useState(false);
+    const initialValues = {
+        phone: "",
+        item_name: "",
+        price: 0,
+        description: "",
+        days: 0,
+    };
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <a href="https://buy.stripe.com/test_6oU7sL2EJdClbcYe6j6oo01" target='_blank'>
-        test stripe payment
-        </a>
+    const { mutate: createItem, error } = useItemMutations("CREATE_ITEM");
+    const schema = Yup.object({
+        phone: Yup.string().required("Phone number is required").matches(/^\d{8}$/, "Phone number must be 8 digits"),
+        item_name: Yup.string().required("Item name is required"),
+        price: Yup.number().required("Price is required").positive(),
+        description: Yup.string().required('Description is required'),
+        days: Yup.number().required('Number of days is required').integer().positive(),
+    });
 
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    const onSubmit = (values: typeof initialValues) => {
+        console.log("triggered onsubmit", values);
+        setShowModal(false);
+        const { phone, item_name, price, description, days } = values;
+        createItem({
+            phone,
+            item_name,
+            price,
+            description,
+            days,
+        });
+    };
+    return (
+        <Container className="d-flex justify-content-center align-items-center vh-100">
+            <div className="card">
+                <h1 className="title">BumpBox</h1>
+                <Button onClick={() => setShowModal(true)}>Open Modal</Button>
+                <Formik
+                    initialValues={initialValues}
+                    onSubmit={onSubmit}
+                    validationSchema={schema}
+                >
+                    {({ submitForm, values }) => (
+                        <Form noValidate>
+                            <Modal show={showModal}>
+                                <Modal.Header
+                                    closeButton
+                                    onHide={() => setShowModal(false)}
+                                >
+                                    <Modal.Title>Modal heading</Modal.Title>
+                                </Modal.Header>
+                                <Modal.Body>
+                                    <Form.Group as={Col} lg>
+                                        <BootstrapInput
+                                            id="item_name"
+                                            type="text"
+                                            required
+                                            value={values.item_name}
+                                            placeholder="Item Name"
+                                            label="Item Name"
+                                        />
+                                    </Form.Group>
+                                    <Form.Group as={Col} lg>
+                                        <BootstrapInput
+                                            id="phone"
+                                            type="text"
+                                            required
+                                            value={values.phone}
+                                            placeholder="Phone Number"
+                                            label="Phone Number"
+                                        />
+                                    </Form.Group>
+                                    <Form.Group as={Col} lg>
+                                        <BootstrapInput
+                                            id="price"
+                                            type="number"
+                                            required
+                                            value={values.price}
+                                            placeholder="Price"
+                                            label="Price"
+                                        />
+                                    </Form.Group>
+                                    <Form.Group as={Col} lg>
+                                        <BootstrapInput
+                                            id="description"
+                                            type="text"
+                                            required
+                                            value={values.description}
+                                            placeholder="Description"
+                                            label="Description"
+                                        />
+                                    </Form.Group>
+                                    <Form.Group as={Col} lg>
+                                        <BootstrapInput
+                                            id="days"
+                                            type="number"
+                                            required
+                                            value={values.days}
+                                            placeholder="Number of Days"
+                                            label="Number of Days"
+                                        />
+                                    </Form.Group>
+
+                                </Modal.Body>
+                                <BootstrapModalFooter
+                                    error={error}
+                                    cancelBtnProps={{
+                                        onClick: () => setShowModal(false),
+                                        Icon: Close,
+                                        label: "Cancel",
+                                    }}
+                                    confirmBtnProps={{
+                                        Icon: Done,
+                                        label: "Submit",
+                                        onClick: () => {
+                                            console.log("clicked submit");
+                                            submitForm();
+                                        },
+                                    }}
+                                />
+                            </Modal>
+                        </Form>
+                    )}
+                </Formik>
+            </div>
+            {/*  */}
+        </Container>
+    );
 }
 
-export default App
+export default App;

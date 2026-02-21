@@ -22,7 +22,7 @@ const items = {
             const schema = Joi.object({
                 itemId: Joi.number().integer().required(),
                 userId: Joi.number().integer().required(),
-                itemname: Joi.string().min(1).max(255).required(),
+                item_name: Joi.string().min(1).max(255).required(),
                 price: Joi.number().precision(2).required(),
                 description: Joi.string().max(255).optional(),
             });
@@ -54,10 +54,10 @@ const items = {
     },
     createNewItem: async (itemData) => {
         try {
-            const query = `INSERT INTO items (userId, itemname, price, description) VALUES (?, ?, ?, ?)`;
+            const query = `INSERT INTO items (userId, item_name, price, description) VALUES (?, ?, ?, ?)`;
             const [result] = await db.execute(query, [
                 itemData.userId,
-                itemData.itemname,
+                itemData.item_name,
                 itemData.price,
                 itemData.description
             ]);
