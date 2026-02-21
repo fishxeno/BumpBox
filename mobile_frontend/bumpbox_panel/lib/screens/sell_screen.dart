@@ -383,14 +383,16 @@ class _SellScreenState extends State<SellScreen> {
                         ),
                         Text(result.confidenceString),
                         const SizedBox(width: 8),
-                        LinearProgressIndicator(
-                          value: result.confidence / 100,
-                          minHeight: 8,
-                          backgroundColor: Colors.grey.shade300,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            result.isHighConfidence
-                                ? Colors.green
-                                : Colors.orange,
+                        Expanded(
+                          child: LinearProgressIndicator(
+                            value: result.confidence / 100,
+                            minHeight: 8,
+                            backgroundColor: Colors.grey.shade300,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              result.isHighConfidence
+                                  ? Colors.green
+                                  : Colors.orange,
+                            ),
                           ),
                         ),
                       ],
