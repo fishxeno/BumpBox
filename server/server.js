@@ -11,6 +11,7 @@ import detectObjectRouter from "./routes/detectObject.js";
 import db from "./dbConnection.js";
 import Stripe from "stripe";
 import cors from "cors";
+import { addDaysAndFormat } from "./utils.js";
 
 const app = express();
 const __dirname = resolve();
@@ -22,22 +23,20 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 let captureTimeout = null;
 
-function scheduleCapture(paymentIntentId) {
+const scheduleCapture = (paymentIntentId) => {
     captureTimeout = setTimeout(async () => {
         try {
             await stripe.paymentIntents.capture(paymentIntentId);
-            console.log("Payment captured");
         } catch (err) {
             console.error("Capture failed:", err);
         }
     }, 5 * 60 * 1000);
 }
 
-function cancelCapture() {
-    if (captureTimeout) {
+const cancelCapture = () => {
+    if (captureTimeout) { //if capture time out exists, then clear the timeout, then wipe the function
         clearTimeout(captureTimeout);
         captureTimeout = null;
-        console.log("Capture canceled");
     }
 }
 
@@ -68,7 +67,7 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
     res.sendStatus(200);
 });
 
-app.post("/return", (req, res) => {
+app.get("/return", (req, res) => {
     cancelCapture();
     res.sendStatus(200);
 });
@@ -82,31 +81,6 @@ app.use(json());
 app.use(urlencoded({ extended: true }));
 app.use(methodOverride());
 app.use(detectObjectRouter);
-
-// //for esp polling
-// app.get("/api/item/status", async (req, res) => {
-//     try {
-//         const itemId = req.query.itemId;
-//         const query = `SELECT * FROM items WHERE itemid = ?`;
-//         const [rows] = await db.execute(query, [itemId]);
-//         if (rows.length === 0) {
-//             return res.status(404).json({ error: "Item not found" });
-//         }
-//         if (rows[0].status == "true") {
-//             return res
-//                 .status(200)
-//                 .json({ status: true, message: "Item is sold" });
-//         }
-//         return res.status(200).json({
-//             status: false,
-//             message: "Item is not sold",
-//             data: rows[0],
-//         });
-//     } catch (error) {
-//         console.error("Get item error:", error.stack);
-//         return res.status(500).json({ error: "Error fetching item" });
-//     }
-// });
 
 //get item, for esp polling, we will only return the latest item, as the esp will only display the latest item
 app.get("/api/item", async (req, res) => {
@@ -132,33 +106,6 @@ app.get("/api/item", async (req, res) => {
         return res.status(500).json({ error: "Error fetching items" });
     }
 });
-
-Date.prototype.addDays = function (days) {
-    var date = new Date(this.valueOf());
-    date.setDate(date.getDate() + days);
-    return date;
-};
-
-function addDaysAndFormat(days, baseDate = new Date()) {
-    const date = new Date(baseDate);
-    date.setDate(date.getDate() + days);
-
-    const pad = (n) => String(n).padStart(2, "0");
-
-    return (
-        date.getFullYear() +
-        "-" +
-        pad(date.getMonth() + 1) +
-        "-" +
-        pad(date.getDate()) +
-        " " +
-        pad(date.getHours()) +
-        ":" +
-        pad(date.getMinutes()) +
-        ":" +
-        pad(date.getSeconds())
-    );
-}
 
 //capture payment endpoint
 app.post("/api/capture", async (req, res) => {
