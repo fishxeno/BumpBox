@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
+import { writeFileSync } from 'fs';
 import { detectLabels, detectLabelsMock } from '../services/visionService.js';
 import { estimatePrice } from '../services/pricingService.js';
 
@@ -23,6 +24,11 @@ router.post('/detect-object', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'No image file provided. Send a multipart form with field name "image".' });
     }
 
+    // Save image for debugging (view in server/debug_capture.jpg)
+    const debugPath = new URL('../debug_capture.jpg', import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1');
+    writeFileSync(debugPath, req.file.buffer);
+    console.log(`[detect-object] Saved debug image: ${debugPath} (${req.file.buffer.length} bytes)`);
+
     const useMock = process.env.USE_MOCK_VISION === 'true' || req.query.mock === 'true';
 
     const labels = useMock
@@ -31,7 +37,9 @@ router.post('/detect-object', upload.single('image'), async (req, res) => {
 
     const priceEstimate = estimatePrice(labels);
 
-    console.log(`[detect-object] Detected: ${priceEstimate.label} (${priceEstimate.confidence}%) | ${priceEstimate.category} | $${priceEstimate.minPrice}-$${priceEstimate.maxPrice}`);
+    console.log(`[detect-object] ALL labels from Vision API:`);
+    labels.forEach((l, i) => console.log(`  ${i+1}. ${l.description} (${Math.round(l.score * 100)}%)`));
+    console.log(`[detect-object] Result: ${priceEstimate.label} (${priceEstimate.confidence}%) | ${priceEstimate.category} | $${priceEstimate.minPrice}-$${priceEstimate.maxPrice}`);
 
     return res.status(200).json({
       success: true,

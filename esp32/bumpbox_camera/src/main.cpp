@@ -10,6 +10,7 @@
  * Trigger:  Button on GPIO 13  OR  type 'c' in Serial Monitor
  */
 
+#include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include "esp_camera.h"
@@ -22,7 +23,7 @@ const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";    // <-- Change this
 
 // -- Server --
 const char* SERVER_URL = "http://bumpbox-env-1.eba-43hmmxwt.ap-southeast-1.elasticbeanstalk.com/detect-object";
-const bool  USE_MOCK   = true;  // true = test without Google Vision API
+const bool  USE_MOCK   = false;  // true = test mode, false = real Google Vision API
 
 // -- Pins --
 #define BUTTON_PIN     13   // Trigger button (connect to GND)
@@ -59,6 +60,15 @@ const bool  USE_MOCK   = true;  // true = test without Google Vision API
 
 // ====================== GLOBALS ======================
 unsigned long lastButtonPress = 0;
+
+// ====================== FORWARD DECLARATIONS ======================
+void flashLED(int times, int durationMs);
+void blinkError(int times);
+void connectWiFi();
+bool initCamera();
+void captureAndSend();
+bool sendToServer(uint8_t* imageData, size_t imageLen);
+void parseResponse(const String& response);
 
 // ====================== LED HELPERS ======================
 
@@ -171,7 +181,7 @@ bool initCamera() {
 // ====================== JSON PARSING ======================
 
 void parseResponse(const String& response) {
-  StaticJsonDocument<1024> doc;
+  JsonDocument doc;
   DeserializationError err = deserializeJson(doc, response);
 
   if (err) {

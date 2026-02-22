@@ -25,3 +25,9 @@ server/credentials/
 *.njsproj
 *.sln
 *.sw?
+
+# ESP32 PlatformIO build artifacts
+esp32/bumpbox_camera/.pio/
+
+# Debug captures
+server/debug_capture.jpg
