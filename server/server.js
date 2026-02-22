@@ -114,7 +114,7 @@ app.get("/api/item", async (req, res) => {
         const query = `SELECT * FROM items ORDER BY itemid DESC LIMIT 1`;
         const [rows] = await db.execute(query);
         if (rows.length === 0) {
-            return res.status(404).json({ error: "Item not found" });
+            return res.status(404).json({ error: "Item not found", status: false });
         }
         if (rows[0].sale_status == 1) {
             return res
