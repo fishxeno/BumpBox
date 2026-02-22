@@ -255,7 +255,7 @@ app.put("/api/item/price", async (req, res) => {
     }
 });
 
-// Start the server
+
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
