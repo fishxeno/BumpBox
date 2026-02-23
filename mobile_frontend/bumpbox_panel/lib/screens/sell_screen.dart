@@ -30,8 +30,7 @@ class _SellScreenState extends State<SellScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _itemNameController;
   late TextEditingController _descriptionController;
-  late TextEditingController _startingPriceController;
-  late TextEditingController _floorPriceController;
+  late TextEditingController _priceController;
   late TextEditingController _phoneController;
   int _selectedDays = 7;
 
@@ -40,8 +39,7 @@ class _SellScreenState extends State<SellScreen> {
     super.initState();
     _itemNameController = TextEditingController();
     _descriptionController = TextEditingController();
-    _startingPriceController = TextEditingController();
-    _floorPriceController = TextEditingController();
+    _priceController = TextEditingController();
     _phoneController = TextEditingController();
   }
 
@@ -50,8 +48,7 @@ class _SellScreenState extends State<SellScreen> {
     _pollingTimer?.cancel();
     _itemNameController.dispose();
     _descriptionController.dispose();
-    _startingPriceController.dispose();
-    _floorPriceController.dispose();
+    _priceController.dispose();
     _phoneController.dispose();
     super.dispose();
   }
@@ -116,8 +113,7 @@ class _SellScreenState extends State<SellScreen> {
   void _populateFormWithDetection(DetectionResult result) {
     _itemNameController.text = result.label;
     _descriptionController.text = 'Category: ${result.category}';
-    _startingPriceController.text = result.suggestedStartingPrice.toString();
-    _floorPriceController.text = result.suggestedFloorPrice.toString();
+    _priceController.text = result.suggestedStartingPrice.toString();
   }
 
   Future<void> _createListing() async {
@@ -138,7 +134,7 @@ class _SellScreenState extends State<SellScreen> {
         phone: phone,
         itemName: _itemNameController.text,
         description: _descriptionController.text,
-        price: double.parse(_startingPriceController.text),
+        price: double.parse(_priceController.text),
         days: _selectedDays,
       );
 
@@ -189,8 +185,7 @@ class _SellScreenState extends State<SellScreen> {
       _isEditing = false;
       _itemNameController.clear();
       _descriptionController.clear();
-      _startingPriceController.clear();
-      _floorPriceController.clear();
+      _priceController.clear();
       _phoneController.clear();
       _selectedDays = 7;
     });
@@ -475,12 +470,12 @@ class _SellScreenState extends State<SellScreen> {
 
                     const SizedBox(height: 20),
 
-                    // Starting Price
-                    _buildFieldLabel('Starting Price:'),
+                    // Price
+                    _buildFieldLabel('Price:'),
                     const SizedBox(height: 8),
                     _isEditing
                         ? TextFormField(
-                            controller: _startingPriceController,
+                            controller: _priceController,
                             decoration: InputDecoration(
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
@@ -498,7 +493,7 @@ class _SellScreenState extends State<SellScreen> {
                             ],
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Please enter a starting price';
+                                return 'Please enter a price';
                               }
                               final price = double.tryParse(value);
                               if (price == null || price <= 0) {
@@ -507,52 +502,7 @@ class _SellScreenState extends State<SellScreen> {
                               return null;
                             },
                           )
-                        : _buildFieldValue(
-                            '\$${_startingPriceController.text}',
-                          ),
-
-                    const SizedBox(height: 20),
-
-                    // Floor Price
-                    _buildFieldLabel('Floor Price:'),
-                    const SizedBox(height: 8),
-                    _isEditing
-                        ? TextFormField(
-                            controller: _floorPriceController,
-                            decoration: InputDecoration(
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              contentPadding: const EdgeInsets.all(16),
-                              prefixText: '\$',
-                            ),
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(
-                                RegExp(r'^\d+\.?\d{0,2}'),
-                              ),
-                            ],
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Please enter a floor price';
-                              }
-                              final floorPrice = double.tryParse(value);
-                              if (floorPrice == null || floorPrice <= 0) {
-                                return 'Invalid price';
-                              }
-                              final startingPrice = double.tryParse(
-                                _startingPriceController.text,
-                              );
-                              if (startingPrice != null &&
-                                  floorPrice > startingPrice) {
-                                return 'Must be ≤ starting price';
-                              }
-                              return null;
-                            },
-                          )
-                        : _buildFieldValue('\$${_floorPriceController.text}'),
+                        : _buildFieldValue('\$${_priceController.text}'),
 
                     const SizedBox(height: 20),
 
