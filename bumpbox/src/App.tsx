@@ -11,6 +11,7 @@ import { BootstrapInput } from "./utils/components/FormikBootstrapinputs";
 function App() {
     const [showModal, setShowModal] = React.useState(false);
     const initialValues = {
+        phone: "",
         item_name: "",
         price: 0,
         description: "",
@@ -19,6 +20,7 @@ function App() {
 
     const { mutate: createItem, error } = useItemMutations("CREATE_ITEM");
     const schema = Yup.object({
+        phone: Yup.string().required("Phone number is required").matches(/^\d{8}$/, "Phone number must be 8 digits"),
         item_name: Yup.string().required("Item name is required"),
         price: Yup.number().required("Price is required").positive(),
         description: Yup.string().required('Description is required'),
@@ -28,8 +30,9 @@ function App() {
     const onSubmit = (values: typeof initialValues) => {
         console.log("triggered onsubmit", values);
         setShowModal(false);
-        const { item_name, price, description, days } = values;
+        const { phone, item_name, price, description, days } = values;
         createItem({
+            phone,
             item_name,
             price,
             description,
@@ -64,6 +67,16 @@ function App() {
                                             value={values.item_name}
                                             placeholder="Item Name"
                                             label="Item Name"
+                                        />
+                                    </Form.Group>
+                                    <Form.Group as={Col} lg>
+                                        <BootstrapInput
+                                            id="phone"
+                                            type="text"
+                                            required
+                                            value={values.phone}
+                                            placeholder="Phone Number"
+                                            label="Phone Number"
                                         />
                                     </Form.Group>
                                     <Form.Group as={Col} lg>
