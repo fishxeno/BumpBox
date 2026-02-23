@@ -11,7 +11,16 @@ import detectObjectRouter from "./routes/detectObject.js";
 import db from "./dbConnection.js";
 import Stripe from "stripe";
 import cors from "cors";
-import { addDaysAndFormat } from "./utils.js";
+import { addDaysAndFormat } from "./utils/helperfunctions.js";
+import mqtt from "mqtt";
+
+const mqttClient = mqtt.connect("mqtt://broker.hivemq.com");
+mqttClient.on("connect", () => {
+    console.log("Connected to MQTT broker");
+});
+mqttClient.on("error", (err) => {
+    console.error("MQTT connection error:", err);
+});
 
 const app = express();
 const __dirname = resolve();
@@ -61,8 +70,14 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
         // meaning checkout is completed, but money is not charged yet, we will capture the payment after 5 minutes
         const session = event.data.object;
         const paymentIntentId = session.payment_intent;
+        mqttClient.publish(
+            "esp32/door1/alayerofsecurity/unlock",
+            JSON.stringify({
+                action: "unlock",
+                paymentId: paymentIntentId
+            })
+        );
         scheduleCapture(paymentIntentId);
-
     }
     res.sendStatus(200);
 });
