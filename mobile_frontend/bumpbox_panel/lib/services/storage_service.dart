@@ -11,6 +11,7 @@ class StorageService {
   static const String _keyItemListedAt = 'current_item_listed_at';
   static const String _keyItemListingDurationDays =
       'current_item_listing_duration_days';
+  static const String _keyItemPaymentLink = 'current_item_payment_link';
   static const String _keySurgeCount = 'surge_count';
   static const String _keyPhysicalSurgeCount = 'physical_surge_count';
   static const String _keyOnlineSurgeCount = 'online_surge_count';
@@ -30,6 +31,12 @@ class StorageService {
       _keyItemListingDurationDays,
       item.listingDuration.inDays,
     );
+    // Save payment link if available
+    if (item.paymentLink != null) {
+      await prefs.setString(_keyItemPaymentLink, item.paymentLink!);
+    } else {
+      await prefs.remove(_keyItemPaymentLink);
+    }
   }
 
   /// Load item from local storage
@@ -45,6 +52,7 @@ class StorageService {
     final floorPrice = prefs.getDouble(_keyItemFloorPrice);
     final listedAtStr = prefs.getString(_keyItemListedAt);
     final listingDurationDays = prefs.getInt(_keyItemListingDurationDays);
+    final paymentLink = prefs.getString(_keyItemPaymentLink);
 
     if (name == null ||
         description == null ||
@@ -65,6 +73,7 @@ class StorageService {
         floorPrice: floorPrice,
         listedAt: listedAt,
         listingDuration: Duration(days: listingDurationDays),
+        paymentLink: paymentLink,
       );
     } catch (e) {
       return null;
