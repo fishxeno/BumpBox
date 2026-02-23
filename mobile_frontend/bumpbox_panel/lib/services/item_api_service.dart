@@ -59,6 +59,7 @@ class ItemApiService {
   /// - description: item description (if available)
   /// - datetime_expire: expiration timestamp
   /// - sale_status: 0 (not sold) or 1 (sold)
+  /// - paymentLink: Stripe payment link URL
   ///
   /// We map these to the Item model's fields:
   /// - id: from itemid
@@ -68,6 +69,7 @@ class ItemApiService {
   /// - floorPrice: calculated as 50% of starting price (backend doesn't store this yet)
   /// - listedAt: calculated from datetime_expire - listingDuration
   /// - listingDuration: from pricing config
+  /// - paymentLink: from paymentLink
   static Item _parseItemFromBackend(Map<String, dynamic> data) {
     final itemId = data['itemid']?.toString() ?? 'unknown';
     final itemName = data['item_name']?.toString() ?? 'Unknown Item';
@@ -75,6 +77,7 @@ class ItemApiService {
     final description =
         data['description']?.toString() ??
         'High-quality item available for purchase';
+    final paymentLink = data['paymentLink']?.toString();
 
     // Parse expiration date to calculate listing time
     final expirationDate = _parseDateTime(data['datetime_expire']);
@@ -90,6 +93,7 @@ class ItemApiService {
       floorPrice: price,
       listedAt: listedAt,
       listingDuration: PricingConfig.listingDuration,
+      paymentLink: paymentLink,
     );
   }
 
@@ -149,5 +153,37 @@ class ItemApiService {
 
     // Fallback to 7 days from now
     return DateTime.now().add(PricingConfig.listingDuration);
+  }
+
+  /// Check if the latest item's payment has been completed
+  ///
+  /// Returns true if the item's sale_status == 1 (sold),
+  /// false if sale_status == 0 (not sold),
+  /// or null if an error occurs.
+  ///
+  /// This is used for polling to detect when a payment completes.
+  static Future<bool?> checkPaymentStatus() async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.getItemUrl),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode != 200) {
+        print(
+          '[ItemApiService] Payment status check failed: ${response.statusCode}',
+        );
+        return null;
+      }
+
+      final jsonData = jsonDecode(response.body);
+
+      // Backend returns { "status": true } when item is sold
+      // and { "status": false } when item is not sold
+      return jsonData['status'] == true;
+    } catch (e) {
+      print('[ItemApiService] Error checking payment status: $e');
+      return null;
+    }
   }
 }

@@ -7,6 +7,7 @@ class Item {
   final double floorPrice; // Seller-set minimum acceptable price
   final DateTime listedAt;
   final Duration listingDuration;
+  final String? paymentLink; // Stripe payment link for purchasing
 
   const Item({
     required this.id,
@@ -16,6 +17,7 @@ class Item {
     required this.floorPrice,
     required this.listedAt,
     this.listingDuration = const Duration(days: 7),
+    this.paymentLink,
   });
 
   /// Calculate how long the item has been listed
@@ -78,6 +80,6 @@ class Item {
   @override
   String toString() {
     return 'Item(id: $id, name: $name, startingPrice: \$${startingPrice.toStringAsFixed(2)}, '
-        'floorPrice: \$${floorPrice.toStringAsFixed(2)}, listedAt: $listedAt)';
+        'floorPrice: \$${floorPrice.toStringAsFixed(2)}, listedAt: $listedAt, paymentLink: $paymentLink)';
   }
 }

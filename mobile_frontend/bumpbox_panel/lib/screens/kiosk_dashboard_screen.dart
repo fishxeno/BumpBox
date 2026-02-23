@@ -12,6 +12,7 @@ import '../services/mock_data_service.dart';
 import '../services/pricing_service.dart';
 import '../services/storage_service.dart';
 import 'attention_monitor_screen.dart';
+import 'payment_dialog.dart';
 import 'sell_screen.dart';
 
 class KioskDashboardScreen extends StatefulWidget {
@@ -1123,7 +1124,60 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                 // Buy Button (Primary Action)
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () {}, // Placeholder - no functionality yet
+                    onPressed: () async {
+                      HapticFeedback.mediumImpact();
+
+                      // Fetch latest item data from backend
+                      debugPrint(
+                        '🛒 Buy button pressed, fetching latest item...',
+                      );
+                      final latestItem = await ItemApiService.fetchLatestItem();
+
+                      if (latestItem == null) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                '❌ Failed to load item information',
+                              ),
+                              duration: Duration(seconds: 3),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+
+                      // Check if payment link exists
+                      if (latestItem.paymentLink == null ||
+                          latestItem.paymentLink!.isEmpty) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                '❌ Payment link not available for this item',
+                              ),
+                              duration: Duration(seconds: 3),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+
+                      // Show payment dialog
+                      final paymentSuccessful = await showPaymentDialog(
+                        context,
+                        item: latestItem,
+                        currentPrice: _currentPrice,
+                      );
+
+                      // Refresh item if payment was successful
+                      if (paymentSuccessful && mounted) {
+                        debugPrint('✅ Payment successful, refreshing item...');
+                        await _refreshItemFromAPI();
+                      }
+                    },
                     icon: const Icon(Icons.shopping_cart, size: 20),
                     label: const Text('Buy'),
                     style: ElevatedButton.styleFrom(
