@@ -162,7 +162,10 @@ class _SellScreenState extends State<SellScreen> {
             TextButton(
               onPressed: () {
                 Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Return to dashboard
+                Navigator.pop(
+                  context,
+                  true,
+                ); // Return to dashboard with success flag
               },
               child: const Text('Done'),
             ),

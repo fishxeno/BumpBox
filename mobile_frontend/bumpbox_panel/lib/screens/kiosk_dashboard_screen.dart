@@ -47,6 +47,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
 
   // Testing: Time offset for fast-forwarding
   int _daysFastForwarded = 0;
+  bool _debugMode = false; // Toggle to show/hide debug buttons
 
   @override
   void initState() {
@@ -219,7 +220,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
       // No saved state, try to fetch from backend API
       debugPrint('📡 Fetching item from backend API...');
       final apiItem = await ItemApiService.fetchLatestItem();
-      
+
       if (apiItem != null) {
         _currentItem = apiItem;
         await StorageService.saveItem(_currentItem);
@@ -237,14 +238,14 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
   }
 
   /// Manually refresh item from backend API
-  /// 
+  ///
   /// This method fetches the latest item from the backend and updates
   /// the display. Useful for testing or when a new item is listed.
   Future<void> _refreshItemFromAPI() async {
     debugPrint('🔄 Manually refreshing item from API...');
-    
+
     final apiItem = await ItemApiService.fetchLatestItem();
-    
+
     if (apiItem != null) {
       setState(() {
         _currentItem = apiItem;
@@ -253,13 +254,13 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
         _physicalSurgeCount = 0;
         _onlineSurgeCount = 0;
       });
-      
+
       await StorageService.saveItem(_currentItem);
       await _saveSurgeCounts();
       _updatePrices();
-      
+
       debugPrint('✅ Refreshed item from API: ${_currentItem.name}');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -271,7 +272,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
       }
     } else {
       debugPrint('❌ Failed to refresh item from API');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -440,11 +441,16 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
         children: [
           // Sell Item Button (primary action)
           FloatingActionButton.extended(
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              final result = await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const SellScreen()),
               );
+
+              // Automatically refresh if item was successfully listed
+              if (result == true && mounted) {
+                await _refreshItemFromAPI();
+              }
             },
             icon: const Icon(Icons.add_shopping_cart),
             label: const Text('Sell Item'),
@@ -453,30 +459,33 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
             tooltip: 'Sell a new item',
             heroTag: 'sell_button',
           ),
-          const SizedBox(height: 16),
-          // Fast Forward Button (testing)
-          FloatingActionButton.extended(
-            onPressed: _fastForwardOneDay,
-            icon: const Icon(Icons.fast_forward),
-            label: Text(
-              _daysFastForwarded > 0 ? '+$_daysFastForwarded d' : 'FF',
+          // Debug buttons (only visible when debug mode is enabled)
+          if (_debugMode) ...[
+            const SizedBox(height: 16),
+            // Fast Forward Button (testing)
+            FloatingActionButton.extended(
+              onPressed: _fastForwardOneDay,
+              icon: const Icon(Icons.fast_forward),
+              label: Text(
+                _daysFastForwarded > 0 ? '+$_daysFastForwarded d' : 'FF',
+              ),
+              backgroundColor: Colors.orange.shade600,
+              foregroundColor: Colors.white,
+              tooltip: 'Fast Forward 1 Day (Testing)',
+              heroTag: 'fastforward_button',
             ),
-            backgroundColor: Colors.orange.shade600,
-            foregroundColor: Colors.white,
-            tooltip: 'Fast Forward 1 Day (Testing)',
-            heroTag: 'fastforward_button',
-          ),
-          const SizedBox(height: 16),
-          // Refresh Item Button (fetch latest from backend)
-          FloatingActionButton.extended(
-            onPressed: _refreshItemFromAPI,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Refresh'),
-            backgroundColor: Colors.blue.shade600,
-            foregroundColor: Colors.white,
-            tooltip: 'Refresh item from backend',
-            heroTag: 'refresh_button',
-          ),
+            const SizedBox(height: 16),
+            // Refresh Item Button (fetch latest from backend)
+            FloatingActionButton.extended(
+              onPressed: _refreshItemFromAPI,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh'),
+              backgroundColor: Colors.blue.shade600,
+              foregroundColor: Colors.white,
+              tooltip: 'Refresh item from backend',
+              heroTag: 'refresh_button',
+            ),
+          ],
         ],
       ),
     );
@@ -763,93 +772,94 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                             ),
                           ),
                           const SizedBox(height: 16),
-                          // Price breakdown
-                          Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Decay base:',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.grey.shade600,
+                          // Price breakdown (debug mode only)
+                          if (_debugMode)
+                            Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Decay base:',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey.shade600,
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    PricingConfig.formatPrice(
-                                      _currentDecayPrice,
+                                    Text(
+                                      PricingConfig.formatPrice(
+                                        _currentDecayPrice,
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey.shade800,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.grey.shade800,
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                                  ],
+                                ),
+                                if (_surgeCount > 0) ...[
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            _getSurgeBadgeIcon(),
+                                            size: 16,
+                                            color: _getSurgeBadgeColor(),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Surge:',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: _getSurgeBadgeColor(),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        '+${PricingConfig.formatPrice(_currentPrice - _currentDecayPrice)}',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: _getSurgeBadgeColor(),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
-                              ),
-                              if (_surgeCount > 0) ...[
+                                const SizedBox(height: 12),
+                                Divider(color: Colors.grey.shade300),
                                 const SizedBox(height: 8),
                                 Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          _getSurgeBadgeIcon(),
-                                          size: 16,
-                                          color: _getSurgeBadgeColor(),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Surge:',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            color: _getSurgeBadgeColor(),
-                                          ),
-                                        ),
-                                      ],
+                                    Text(
+                                      'Floor price:',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade500,
+                                      ),
                                     ),
                                     Text(
-                                      '+${PricingConfig.formatPrice(_currentPrice - _currentDecayPrice)}',
+                                      PricingConfig.formatPrice(
+                                        _currentItem.floorPrice,
+                                      ),
                                       style: TextStyle(
-                                        fontSize: 16,
-                                        color: _getSurgeBadgeColor(),
-                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                        color: Colors.grey.shade500,
                                       ),
                                     ),
                                   ],
                                 ),
                               ],
-                              const SizedBox(height: 12),
-                              Divider(color: Colors.grey.shade300),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Floor price:',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey.shade500,
-                                    ),
-                                  ),
-                                  Text(
-                                    PricingConfig.formatPrice(
-                                      _currentItem.floorPrice,
-                                    ),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey.shade500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                            ),
                         ],
                       ),
                     ),
@@ -900,18 +910,39 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
 
             const SizedBox(height: 32),
 
-            // Item Name
-            Text(
-              _currentItem.name,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 40,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey.shade900,
-                letterSpacing: -1,
-                height: 1.1,
+            // Item Name (Long press to toggle debug mode)
+            GestureDetector(
+              onLongPress: () {
+                setState(() {
+                  _debugMode = !_debugMode;
+                });
+                HapticFeedback.mediumImpact();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      _debugMode
+                          ? '🛠️ Debug mode enabled'
+                          : '✅ Debug mode disabled',
+                    ),
+                    duration: const Duration(seconds: 2),
+                    backgroundColor: _debugMode
+                        ? Colors.orange.shade700
+                        : Colors.green.shade700,
+                  ),
+                );
+              },
+              child: Text(
+                _currentItem.name,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 40,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade900,
+                  letterSpacing: -1,
+                  height: 1.1,
+                ),
               ),
             ),
 
@@ -1000,45 +1031,47 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                           ),
                           child: Text(PricingConfig.formatPrice(_currentPrice)),
                         ),
-                        const SizedBox(height: 12),
-                        // Price details
-                        Text(
-                          'Decay: ${PricingConfig.formatPrice(_currentDecayPrice)}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade600,
+                        // Price details (debug mode only)
+                        if (_debugMode) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'Decay: ${PricingConfig.formatPrice(_currentDecayPrice)}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                            ),
                           ),
-                        ),
-                        if (_surgeCount > 0) ...[
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _getSurgeBadgeIcon(),
-                                size: 13,
-                                color: _getSurgeBadgeColor(),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Surge: +${PricingConfig.formatPrice(_currentPrice - _currentDecayPrice)}',
-                                style: TextStyle(
-                                  fontSize: 13,
+                          if (_surgeCount > 0) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _getSurgeBadgeIcon(),
+                                  size: 13,
                                   color: _getSurgeBadgeColor(),
-                                  fontWeight: FontWeight.w600,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Surge: +${PricingConfig.formatPrice(_currentPrice - _currentDecayPrice)}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: _getSurgeBadgeColor(),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          Text(
+                            'Floor: ${PricingConfig.formatPrice(_currentItem.floorPrice)}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
                           ),
                         ],
-                        const SizedBox(height: 8),
-                        Text(
-                          'Floor: ${PricingConfig.formatPrice(_currentItem.floorPrice)}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
                       ],
                     ),
                   ),
