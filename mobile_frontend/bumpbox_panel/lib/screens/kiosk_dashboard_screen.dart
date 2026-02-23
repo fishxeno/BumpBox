@@ -440,25 +440,25 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           // Sell Item Button (primary action)
-          FloatingActionButton.extended(
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SellScreen()),
-              );
+          // FloatingActionButton.extended(
+          // onPressed: () async {
+          //   final result = await Navigator.push(
+          //     context,
+          //     MaterialPageRoute(builder: (context) => const SellScreen()),
+          //   );
 
-              // Automatically refresh if item was successfully listed
-              if (result == true && mounted) {
-                await _refreshItemFromAPI();
-              }
-            },
-            icon: const Icon(Icons.add_shopping_cart),
-            label: const Text('Sell Item'),
-            backgroundColor: Colors.green.shade600,
-            foregroundColor: Colors.white,
-            tooltip: 'Sell a new item',
-            heroTag: 'sell_button',
-          ),
+          //   // Automatically refresh if item was successfully listed
+          //   if (result == true && mounted) {
+          //     await _refreshItemFromAPI();
+          //   }
+          // },
+          //   icon: const Icon(Icons.add_shopping_cart),
+          //   label: const Text('Sell Item'),
+          //   backgroundColor: Colors.green.shade600,
+          //   foregroundColor: Colors.white,
+          //   tooltip: 'Sell a new item',
+          //   heroTag: 'sell_button',
+          // ),
           // Debug buttons (only visible when debug mode is enabled)
           if (_debugMode) ...[
             const SizedBox(height: 16),
@@ -1115,6 +1115,80 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                 ),
               ),
             ],
+
+            // Action Buttons
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                // Buy Button (Primary Action)
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {}, // Placeholder - no functionality yet
+                    icon: const Icon(Icons.shopping_cart, size: 20),
+                    label: const Text('Buy'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4169E1), // Royal blue
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Test Button (Secondary Action)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {}, // Placeholder - no functionality yet
+                    icon: const Icon(Icons.timer, size: 20),
+                    label: const Text(
+                      'Test 5 min',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.grey.shade800,
+                      side: BorderSide(color: Colors.grey.shade400, width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Sell Item Button (Tertiary Action)
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SellScreen(),
+                        ),
+                      );
+
+                      // Automatically refresh if item was successfully listed
+                      if (result == true && mounted) {
+                        await _refreshItemFromAPI();
+                      }
+                    }, // Placeholder - no functionality yet
+                    icon: const Icon(Icons.sell, size: 20),
+                    label: const Text('Sell'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
           ],
         ),
