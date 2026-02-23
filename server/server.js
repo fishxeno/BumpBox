@@ -11,8 +11,17 @@ import detectObjectRouter from "./routes/detectObject.js";
 import db from "./dbConnection.js";
 import Stripe from "stripe";
 import cors from "cors";
-import { addDaysAndFormat } from "./utils/helperfunctions.js";
+import { addDaysAndFormat } from "./utils/helperfunctions/helperfunctions.js";
 import { setCaptureTrigger, getAndResetCaptureTrigger, getLatestDetection, storeDetection, latestDetection } from './storage.js';
+import mqtt from "mqtt";
+
+const mqttClient = mqtt.connect("mqtt://broker.hivemq.com");
+mqttClient.on("connect", () => {
+    console.log("Connected to MQTT broker");
+});
+mqttClient.on("error", (err) => {
+    console.error("MQTT connection error:", err);
+});
 
 const app = express();
 const __dirname = resolve();
@@ -53,17 +62,24 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
         // meaning money is charged successfully, update item to sold
         //mysql doesn't want select and update in the same query, so we have to do it in 2 queries
         const [rows] = await db.execute(
-            `SELECT itemid FROM items ORDER BY itemid DESC LIMIT 1`,
+            `SELECT * FROM items ORDER BY itemid DESC LIMIT 1`,
         );
         const query = `UPDATE items SET sale_status = 1 WHERE itemid = ?`;
         await db.execute(query, rows[0].itemid);
+        await stripe.paymentLinks.update(rows[0].paymentLink, { active: false });
 
     } else if (event.type === "checkout.session.completed") {
         // meaning checkout is completed, but money is not charged yet, we will capture the payment after 5 minutes
         const session = event.data.object;
         const paymentIntentId = session.payment_intent;
+        mqttClient.publish(
+            "esp32/door1/alayerofsecurity/unlock",
+            JSON.stringify({
+                action: "unlock",
+                paymentId: paymentIntentId
+            })
+        );
         scheduleCapture(paymentIntentId);
-
     }
     res.sendStatus(200);
 });
@@ -288,11 +304,11 @@ app.post("/api/item", async (req, res) => {
 // Endpoint to edit price of latest item
 app.put("/api/item/price", async (req, res) => {
     try {
-        const [itemId] = await db.execute(`SELECT itemid, productid FROM items ORDER BY itemid DESC LIMIT 1`);
+        const [item] = await db.execute(`SELECT itemid, productid, paymentLink FROM items ORDER BY itemid DESC LIMIT 1`);
         const newPrice = await stripe.prices.create({
             unit_amount: Math.round(req.body.price * 100), // Convert to cents
             currency: "sgd",
-            product: itemId[0].productid,
+            product: item[0].productid,
         });
 
         const paymentLink = await stripe.paymentLinks.create({
@@ -309,8 +325,8 @@ app.put("/api/item/price", async (req, res) => {
 
         const query = `UPDATE items SET price = ?, priceid = ?, paymentLink = ? WHERE itemid = ?`;
         await db.execute(query, [req.body.price, newPrice.id, paymentLink.url, itemId[0].itemid]);
-
-        const [updatedRows] = await db.execute(`SELECT * FROM items WHERE itemid = ?`, [itemId[0].itemid]);
+        await stripe.paymentLinks.update(item[0].paymentLink, { active: false });
+        const [updatedRows] = await db.execute(`SELECT * FROM items WHERE itemid = ?`, [item[0].itemid]);
         return res.status(200).json({ items: updatedRows });// return new payment link for frontend to update
     } catch (error) {
         console.error("Update item error:", error.stack);

@@ -1,11 +1,11 @@
-import { Button, Modal, Form, Container, Col } from "react-bootstrap";
+import { Button, Modal, Form, Container, Col, Card } from "react-bootstrap";
 import "./App.css";
 import React from "react";
 import { Formik } from "formik";
 import * as Yup from "yup";
 import { Close, Done } from "@mui/icons-material";
 import BootstrapModalFooter from "./utils/BootstrapModalFooter";
-import { useItemMutations } from "./api/itemService";
+import { useItem, useItemMutations } from "./api/itemService";
 import { BootstrapInput } from "./utils/components/FormikBootstrapinputs";
 
 function App() {
@@ -18,6 +18,8 @@ function App() {
         days: 0,
     };
 
+    const { data: item } = useItem();
+
     const { mutate: createItem, error } = useItemMutations("CREATE_ITEM");
     const schema = Yup.object({
         phone: Yup.string().required("Phone number is required").matches(/^\d{8}$/, "Phone number must be 8 digits"),
@@ -28,7 +30,6 @@ function App() {
     });
 
     const onSubmit = (values: typeof initialValues) => {
-        console.log("triggered onsubmit", values);
         setShowModal(false);
         const { phone, item_name, price, description, days } = values;
         createItem({
@@ -39,8 +40,20 @@ function App() {
             days,
         });
     };
+
+
     return (
         <Container className="d-flex justify-content-center align-items-center vh-100">
+            <div>
+                <Card>
+                    <Card.Body>
+                        <Card.Title>Welcome to BumpBox</Card.Title>
+                        <Card.Text>
+                            {item ? `Current item: ${item.data.item_name}` : "No items available"}
+                        </Card.Text>
+                    </Card.Body>
+                </Card>
+            </div>
             <div className="card">
                 <h1 className="title">BumpBox</h1>
                 <Button onClick={() => setShowModal(true)}>Open Modal</Button>

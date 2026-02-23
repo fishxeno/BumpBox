@@ -5,13 +5,26 @@ import {
 } from "./simpleAPI";
 
 export const itemQueries = {
-    ITEM: (itemId: number) => ["item", itemId] as const,
+    ITEM: () => ["item"] as const,
 };
 
 export const itemBaseRoute = "/api/items";
 
-export function useItem(itemId: number) {
-    return useAPIQuery(itemQueries.ITEM(itemId), `${itemBaseRoute}/${itemId}`);
+interface GetItem {
+    status: boolean;
+    data: {
+        id: number;
+        item_name: string;
+        phone: string;
+        price: number;
+        description: string;
+        days: number;
+    };
+    message: string;
+}
+
+export function useItem() {
+    return useAPIQuery<GetItem>(itemQueries.ITEM(), `/api/item`);
 }
 
 interface CreateItemInterface {
