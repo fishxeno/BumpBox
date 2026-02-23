@@ -64,8 +64,8 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
             `SELECT * FROM items ORDER BY itemid DESC LIMIT 1`,
         );
         const query = `UPDATE items SET sale_status = 1 WHERE itemid = ?`;
-        await db.execute(query, rows[0].itemid);
-        await stripe.paymentLinks.update(rows[0].paymentLink, { active: false });
+        await db.execute(query, [rows[0].itemid]);
+        await stripe.paymentLinks.update(rows[0].paymentLinkid, { active: false });
 
     } else if (event.type === "checkout.session.completed") {
         // meaning checkout is completed, but money is not charged yet, we will capture the payment after 5 minutes
@@ -83,11 +83,6 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
     res.sendStatus(200);
 });
 
-app.get("/return", (req, res) => {
-    cancelCapture();
-    res.sendStatus(200);
-});
-
 app.use(
     cors({
         origin: ["http://localhost:5173", "http://localhost:8080"],
@@ -97,6 +92,11 @@ app.use(json());
 app.use(urlencoded({ extended: true }));
 app.use(methodOverride());
 app.use(detectObjectRouter);
+
+app.get("/return", (req, res) => {
+    cancelCapture();
+    res.sendStatus(200);
+});
 
 //get item, for esp polling, we will only return the latest item, as the esp will only display the latest item
 app.get("/api/item", async (req, res) => {
@@ -120,23 +120,6 @@ app.get("/api/item", async (req, res) => {
     } catch (error) {
         console.error("Get items error:", error.stack);
         return res.status(500).json({ error: "Error fetching items" });
-    }
-});
-
-//capture payment endpoint
-app.post("/api/capture", async (req, res) => {
-    try {
-        const paymentIntentId = req.body.paymentIntentId;
-        const paymentIntent =
-            await stripe.paymentIntents.capture(paymentIntentId);
-        const query = `UPDATE items SET sale_status = 0 WHERE priceid = ?`;
-        const [rows] = await db.execute(query, [paymentIntent.payment_method]);
-        return res
-            .status(200)
-            .json({ message: "Payment captured successfully", data: rows });
-    } catch (error) {
-        console.error("Capture payment error:", error.stack);
-        return res.status(500).json({ error: "Error capturing payment" });
     }
 });
 
@@ -164,7 +147,7 @@ app.post("/api/item", async (req, res) => {
             ],
         });
         const itemData = req.body;
-        const query = `INSERT INTO items (phone, item_name, price, productid, priceid, datetime_expire, paymentLink) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+        const query = `INSERT INTO items (phone, item_name, price, productid, priceid, datetime_expire, paymentLink, paymentLinkid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
         const [rows] = await db.execute(query, [
             itemData.phone,
             itemData.item_name,
@@ -173,6 +156,7 @@ app.post("/api/item", async (req, res) => {
             product.default_price,
             addDaysAndFormat(itemData.days),
             paymentLink.url,
+            paymentLink.id
         ]);
         return res.status(201).json({
             message: "Item created successfully",
@@ -188,7 +172,7 @@ app.post("/api/item", async (req, res) => {
 // Endpoint to edit price of latest item
 app.put("/api/item/price", async (req, res) => {
     try {
-        const [item] = await db.execute(`SELECT itemid, productid, paymentLink FROM items ORDER BY itemid DESC LIMIT 1`);
+        const [item] = await db.execute(`SELECT itemid, productid, paymentLink, paymentLinkid FROM items ORDER BY itemid DESC LIMIT 1`);
         const newPrice = await stripe.prices.create({
             unit_amount: Math.round(req.body.price * 100), // Convert to cents
             currency: "sgd",
@@ -207,9 +191,9 @@ app.put("/api/item/price", async (req, res) => {
             ],
         });
 
-        const query = `UPDATE items SET price = ?, priceid = ?, paymentLink = ? WHERE itemid = ?`;
-        await db.execute(query, [req.body.price, newPrice.id, paymentLink.url, itemId[0].itemid]);
-        await stripe.paymentLinks.update(item[0].paymentLink, { active: false });
+        const query = `UPDATE items SET price = ?, priceid = ?, paymentLink = ?, paymentLinkid = ? WHERE itemid = ?`;
+        await db.execute(query, [req.body.price, newPrice.id, paymentLink.url, paymentLink.id, item[0].itemid]);
+        await stripe.paymentLinks.update(item[0].paymentLinkid, { active: false });
         const [updatedRows] = await db.execute(`SELECT * FROM items WHERE itemid = ?`, [item[0].itemid]);
         return res.status(200).json({ items: updatedRows });// return new payment link for frontend to update
     } catch (error) {
