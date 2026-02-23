@@ -57,9 +57,11 @@ const bool  USE_MOCK   = false;  // true = test mode, false = real Google Vision
 #define WIFI_TIMEOUT_MS   15000
 #define HTTP_TIMEOUT_MS   15000
 #define FLASH_WARMUP_MS   150
+#define POLL_INTERVAL_MS  2000  // Poll trigger endpoint every 2 seconds
 
 // ====================== GLOBALS ======================
 unsigned long lastButtonPress = 0;
+unsigned long lastPollTime = 0;
 
 // ====================== FORWARD DECLARATIONS ======================
 void flashLED(int times, int durationMs);
@@ -69,6 +71,7 @@ bool initCamera();
 void captureAndSend();
 bool sendToServer(uint8_t* imageData, size_t imageLen);
 void parseResponse(const String& response);
+bool checkTriggerFromBackend();
 
 // ====================== LED HELPERS ======================
 
@@ -181,7 +184,7 @@ bool initCamera() {
 // ====================== JSON PARSING ======================
 
 void parseResponse(const String& response) {
-  JsonDocument doc;
+  StaticJsonDocument<1024> doc;
   DeserializationError err = deserializeJson(doc, response);
 
   if (err) {
@@ -217,7 +220,9 @@ void parseResponse(const String& response) {
 
 bool sendToServer(uint8_t* imageData, size_t imageLen) {
   String url = SERVER_URL;
-  if (USE_MOCK) url += "?mock=true";
+  url += "?lockerId=";
+  url += LOCKER_ID;
+  if (USE_MOCK) url += "&mock=true";
 
   String boundary  = "----BumpBoxESP32Boundary";
   String bodyStart = "--" + boundary + "\r\n"
@@ -264,6 +269,47 @@ bool sendToServer(uint8_t* imageData, size_t imageLen) {
   } else {
     Serial.printf("[HTTP] Request failed: %s\n", http.errorToString(code).c_str());
   }
+  http.end();
+  return false;
+}
+
+// ====================== POLLING ======================
+
+bool checkTriggerFromBackend() {
+  HTTPClient http;
+  http.begin(POLL_TRIGGER_URL);
+  http.setTimeout(5000);  // Shorter timeout for polling
+
+  int code = http.GET();
+  
+  if (code == 200) {
+    String resp = http.getString();
+    http.end();
+    
+    // Parse JSON response
+    StaticJsonDocument<256> doc;
+    DeserializationError err = deserializeJson(doc, resp);
+    
+    if (err) {
+      Serial.print("[Polling] JSON parse error: ");
+      Serial.println(err.c_str());
+      return false;
+    }
+    
+    bool shouldCapture = doc["shouldCapture"] | false;
+    return shouldCapture;
+  }
+  
+  // Don't log errors for polling failures to avoid spam
+  if (code > 0 && code != 200) {
+    // Only log non-200 status codes occasionally
+    static unsigned long lastErrorLog = 0;
+    if (millis() - lastErrorLog > 60000) {  // Log once per minute
+      Serial.printf("[Polling] Server returned %d\n", code);
+      lastErrorLog = millis();
+    }
+  }
+  
   http.end();
   return false;
 }
@@ -340,11 +386,23 @@ void setup() {
   }
 
   connectWiFi();
-  Serial.println("[Ready] Waiting for trigger...\n");
+  Serial.println("[Ready] Waiting for trigger...");
+  Serial.println("[Polling] Checking backend every 2 seconds for capture trigger\n");
 }
 
 void loop() {
   bool trigger = false;
+
+  // Poll backend for trigger (every POLL_INTERVAL_MS)
+  if (millis() - lastPollTime > POLL_INTERVAL_MS) {
+    lastPollTime = millis();
+    if (WiFi.status() == WL_CONNECTED) {
+      if (checkTriggerFromBackend()) {
+        Serial.println("[Trigger] Backend capture request");
+        trigger = true;
+      }
+    }
+  }
 
   // Button check (active LOW, with debounce)
   if (digitalRead(BUTTON_PIN) == LOW && millis() - lastButtonPress > DEBOUNCE_MS) {

@@ -7,6 +7,7 @@ class DetectionResult {
   final int confidence;
   final DateTime timestamp;
   final String? lockerId;
+  final String? imageUrl;
 
   const DetectionResult({
     required this.label,
@@ -16,6 +17,7 @@ class DetectionResult {
     required this.confidence,
     required this.timestamp,
     this.lockerId,
+    this.imageUrl,
   });
 
   /// Create from JSON response from backend
@@ -35,6 +37,9 @@ class DetectionResult {
           ? DateTime.parse(json['timestamp'] as String)
           : DateTime.now(),
       lockerId: json['lockerId'] as String?,
+      imageUrl: json['hasImage'] == true
+          ? null
+          : null, // Will be set separately
     );
   }
 

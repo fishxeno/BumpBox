@@ -52,7 +52,7 @@ router.post('/detect-object', upload.single('image'), async (req, res) => {
 
     // Store detection result for Flutter app polling
     const lockerId = req.query.lockerId || req.body.lockerId || 'locker1';
-    storeDetection(detection, lockerId);
+    storeDetection(detection, lockerId, req.file.buffer);
 
     return res.status(200).json({
       success: true,

@@ -1,14 +1,16 @@
 /// API configuration for BumpBox backend integration
 class ApiConfig {
   /// Base URL for the backend server
-  static const String baseUrl =
-      'http://192.168.1.19:8080';
+  static const String baseUrl = 'http://10.192.1.2:8080';
 
   /// Endpoint to trigger ESP32 camera capture
   static const String triggerCaptureEndpoint = '/api/locker/trigger-capture';
 
   /// Endpoint to fetch latest detection result
   static const String latestDetectionEndpoint = '/api/detections/latest';
+
+  /// Endpoint to fetch latest captured image
+  static const String latestImageEndpoint = '/api/detections/latest-image';
 
   /// Endpoint to create a new item listing
   static const String createItemEndpoint = '/api/item';
@@ -27,6 +29,9 @@ class ApiConfig {
 
   /// Full URL for latest detection
   static String get latestDetectionUrl => '$baseUrl$latestDetectionEndpoint';
+
+  /// Full URL for latest image
+  static String get latestImageUrl => '$baseUrl$latestImageEndpoint';
 
   /// Full URL for creating items
   static String get createItemUrl => '$baseUrl$createItemEndpoint';

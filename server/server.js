@@ -12,7 +12,7 @@ import db from "./dbConnection.js";
 import Stripe from "stripe";
 import cors from "cors";
 import { addDaysAndFormat } from "./utils/helperfunctions.js";
-import { setCaptureTrigger, getAndResetCaptureTrigger, getLatestDetection, storeDetection } from './storage.js';
+import { setCaptureTrigger, getAndResetCaptureTrigger, getLatestDetection, storeDetection, latestDetection } from './storage.js';
 
 const app = express();
 const __dirname = resolve();
@@ -122,6 +122,21 @@ app.get('/api/detections/latest', (req, res) => {
     }
 });
 
+// Get latest captured image (polled by Flutter app)
+app.get('/api/detections/latest-image', (req, res) => {
+    try {
+        if (!latestDetection.imageBuffer) {
+            return res.status(404).json({ error: 'No image available' });
+        }
+        res.set('Content-Type', 'image/jpeg');
+        res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+        return res.send(latestDetection.imageBuffer);
+    } catch (error) {
+        console.error('[detections/latest-image] Error:', error.message);
+        return res.status(500).json({ error: 'Failed to fetch image' });
+    }
+});
+
 //get item, for esp polling, we will only return the latest item, as the esp will only display the latest item
 app.get("/api/item", async (req, res) => {
     try {
@@ -146,26 +161,6 @@ app.get("/api/item", async (req, res) => {
         return res.status(500).json({ error: "Error fetching items" });
     }
 });
-
-//for esp polling (on specific itemId)
-app.get('/api/item/status', async (req, res) => {
-    try {
-        const itemId = req.query.itemId;
-        const query = `SELECT * FROM items WHERE itemid = ?`;
-        const [rows] = await db.execute(query, [itemId]);
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'Item not found' });
-        }
-        if (rows[0].status == 'true') {
-            return res.status(200).json({ status: true, message: 'Item is sold' });
-        }
-        return res.status(200).json({ status: false, message: 'Item is not sold', data: rows[0] });
-    } catch (error) {
-        console.error('Get item error:', error.stack);
-        return res.status(500).json({ error: 'Error fetching item' });
-    }
-});
-
 
 // TEST ENDPOINT: Simulate ESP32 detection without hardware
 app.post('/api/test/simulate-detection', (req, res) => {

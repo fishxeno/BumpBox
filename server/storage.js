@@ -14,7 +14,8 @@ export const captureTrigger = {
 export const latestDetection = {
   result: null,
   timestamp: null,
-  lockerId: null
+  lockerId: null,
+  imageBuffer: null
 };
 
 /**
@@ -42,13 +43,14 @@ export function getAndResetCaptureTrigger() {
 }
 
 /**
- * Store a detection result
+ * Store a detection result with optional image buffer
  */
-export function storeDetection(detection, lockerId = 'locker1') {
+export function storeDetection(detection, lockerId = 'locker1', imageBuffer = null) {
   const timestamp = new Date().toISOString();
   latestDetection.result = detection;
   latestDetection.timestamp = timestamp;
   latestDetection.lockerId = lockerId;
+  latestDetection.imageBuffer = imageBuffer;
   
   // Optional: Add TTL to clear old detections after 5 minutes
   setTimeout(() => {
@@ -56,6 +58,7 @@ export function storeDetection(detection, lockerId = 'locker1') {
       latestDetection.result = null;
       latestDetection.timestamp = null;
       latestDetection.lockerId = null;
+      latestDetection.imageBuffer = null;
     }
   }, 5 * 60 * 1000); // 5 minutes
 }
@@ -80,6 +83,7 @@ export function getLatestDetection(sinceTimestamp = null) {
   return {
     detection: latestDetection.result,
     timestamp: latestDetection.timestamp,
-    lockerId: latestDetection.lockerId
+    lockerId: latestDetection.lockerId,
+    hasImage: latestDetection.imageBuffer !== null
   };
 }

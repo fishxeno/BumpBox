@@ -364,9 +364,37 @@ class _SellScreenState extends State<SellScreen> {
                   ),
                   padding: const EdgeInsets.all(16),
                   child: Image.network(
-                    'https://m.media-amazon.com/images/I/612u463P8LL.jpg',
+                    '${ApiConfig.latestImageUrl}?t=${DateTime.now().millisecondsSinceEpoch}',
                     height: 250,
                     fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.broken_image,
+                            size: 100,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'No image available',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      );
+                    },
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
