@@ -21,8 +21,8 @@ class PricingConfig {
 
   // ===== Surge Pricing Settings =====
 
-  /// Multiplier applied per attention/interest event (5% as per PRD)
-  static const double surgeMultiplier = 1.05;
+  /// Multiplier applied per attention/interest event (1%)
+  static const double surgeMultiplier = 1.01;
 
   /// Maximum surge multiplier to prevent runaway pricing
   static const double maxSurgeMultiplier = 1.50; // 50% max increase
@@ -59,7 +59,7 @@ class PricingConfig {
   static const Duration onlineActivityWindow = Duration(minutes: 5);
 
   /// Probability (0.0 to 1.0) of simulated online surge per poll
-  static const double mockOnlineSurgeProbability = 0.05; // 5% chance every poll
+  static const double mockOnlineSurgeProbability = 0.01; // 1% chance every poll
 
   // ===== Display Settings =====
 

@@ -8,9 +8,11 @@ A Flutter app to be displayed on the BumpBox as a dashboard screen.
 - **Time-Decay Pricing**: Exponential price decay over 7-day listing period
 - **Attention Detection**: Physical presence tracking using ML Kit Face Detection
 - **Surge Pricing**: Dynamic price increases based on attention (physical + simulated online)
+- **Backend Integration**: Fetches listed items from backend API (`/api/item` endpoint)
 - **Mock Backend**: Simulated online interest data (views, clicks, wishlist)
 - **Real-time Updates**: Price automatically updates every 10 seconds
 - **Data Persistence**: State saved across app restarts using SharedPreferences
+- **Manual Refresh**: Button to reload latest item from backend API
 - **Enhanced UI**: 
   - Shows current price breakdown (decay base + surge offset)
   - Time remaining countdown
@@ -53,26 +55,28 @@ price = floorPrice + (startingPrice - floorPrice) * decayBase^hoursElapsed
 - **Key behavior**: Price returns to **current decay base**, not original starting price
 
 ### Integration Points for Backend
-Mock backend ready for replacement with real API:
-- `MockDataService.getMockItem()` → `GET /api/items/:id`
-- `MockDataService.getRealisticOnlineInterest()` → `GET /api/items/:id/online-interest`
-- `MockDataService.shouldTriggerOnlineSurge()` → Backend surge decision logic
-- Storage service saves state locally, can sync with backend on network restore
+- ✅ **Item Fetching**: `ItemApiService.fetchLatestItem()` → `GET /api/item` (implemented)
+- **Online Interest** (todo): `MockDataService.getRealisticOnlineInterest()` → `GET /api/items/:id/online-interest`
+- **Surge Decision** (todo): `MockDataService.shouldTriggerOnlineSurge()` → Backend surge decision logic
+- **State Sync**: Storage service saves state locally, can sync with backend on network restore
 
 ## Project Structure
 ```
 lib/
 ├── config/
+│   ├── api_config.dart              # Backend API configuration
 │   └── pricing_config.dart          # All pricing constants
 ├── models/
 │   ├── attention_state.dart         # Face tracking state
 │   └── item.dart                    # Item/listing model
 ├── screens/
 │   ├── attention_monitor_screen.dart # Debug screen (existing)
-│   └── kiosk_dashboard_screen.dart  # Main production UI
+│   ├── kiosk_dashboard_screen.dart  # Main production UI
+│   └── sell_screen.dart             # Sell item flow
 ├── services/
 │   ├── attention_detector.dart      # Face detection (existing)
 │   ├── camera_service.dart          # Camera management (existing)
+│   ├── item_api_service.dart        # Backend item fetching service
 │   ├── mock_data_service.dart       # Simulated backend
 │   ├── pricing_service.dart         # Pricing calculations
 │   └── storage_service.dart         # Local persistence
@@ -80,6 +84,31 @@ lib/
 ```
 
 ## Configuration
+
+### Backend Server Connection
+The app connects to the BumpBox backend server to fetch listed items.
+
+**Configure the server URL** in `lib/config/api_config.dart`:
+```dart
+static const String baseUrl = 'http://10.192.1.2:8080';
+```
+
+**Setup options:**
+- **Local testing**: `'http://localhost:8080'` or `'http://127.0.0.1:8080'`
+- **Network testing**: `'http://<your-local-ip>:8080'` (e.g., `'http://10.192.1.2:8080'`)
+- **Production**: `'https://your-domain.com'`
+
+**Note:** iOS simulator can use localhost, but physical devices need the network IP address.
+
+**Backend endpoint used:**
+- `GET /api/item` - Fetches the latest listed item
+
+**Item Loading Behavior:**
+1. On first app launch, attempts to fetch latest item from backend API
+2. If API fetch succeeds, displays the item and saves locally
+3. If API fails or no item found, falls back to mock data
+4. On subsequent launches, uses locally saved item
+5. Use the "Refresh" button to manually fetch latest item from backend
 
 ### Testing vs Production Thresholds
 Currently using **testing values** for faster iteration:
