@@ -6,6 +6,8 @@ import '../models/detection_result.dart';
 import '../services/detection_service.dart';
 import '../services/item_creation_service.dart';
 
+enum _ScreenState { ready, triggering, detecting, showingResults, creating }
+
 /// Screen for sellers to list items using ESP32 camera detection
 class SellScreen extends StatefulWidget {
   const SellScreen({super.key});
@@ -22,6 +24,7 @@ class _SellScreenState extends State<SellScreen> {
   Timer? _pollingTimer;
   DateTime? _pollingStartTime;
   int _elapsedSeconds = 0;
+  bool _isEditing = false;
 
   // Form controllers
   final _formKey = GlobalKey<FormState>();
@@ -183,6 +186,7 @@ class _SellScreenState extends State<SellScreen> {
       _currentState = _ScreenState.ready;
       _detectionResult = null;
       _errorMessage = null;
+      _isEditing = false;
       _itemNameController.clear();
       _descriptionController.clear();
       _startingPriceController.clear();
@@ -196,9 +200,13 @@ class _SellScreenState extends State<SellScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sell Item'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        title: const Text(
+          'List Your Item',
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: const Color(0xFF4169E1), // Royal blue
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: _buildBody(),
     );
@@ -334,278 +342,330 @@ class _SellScreenState extends State<SellScreen> {
   }
 
   Widget _buildResultsForm() {
-    final result = _detectionResult!;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
-      child: Form(
-        key: _formKey,
+    return Card(
+      margin: const EdgeInsets.all(16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 4,
+      child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Detection Result Card
-            Card(
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
+            // Image Section
+            Container(
+              color: Colors.grey[100],
+              padding: const EdgeInsets.all(32.0),
+              child: Center(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: Image.network(
+                    'https://m.media-amazon.com/images/I/612u463P8LL.jpg',
+                    height: 250,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+
+            // Form Section
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(20.0),
+              child: Form(
+                key: _formKey,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Item Details Header with Edit/Done button
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Icon(
-                          Icons.check_circle,
-                          color: Colors.green,
-                          size: 32,
-                        ),
-                        const SizedBox(width: 12),
                         const Text(
-                          'Item Detected',
+                          'Item Details',
                           style: TextStyle(
-                            fontSize: 22,
+                            fontSize: 24,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ],
-                    ),
-                    const Divider(height: 24),
-                    _buildInfoRow('Item:', result.label),
-                    const SizedBox(height: 8),
-                    _buildInfoRow('Category:', result.category),
-                    const SizedBox(height: 8),
-                    _buildInfoRow('Suggested Price:', result.priceRangeString),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Text(
-                          'Confidence: ',
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        Text(result.confidenceString),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: LinearProgressIndicator(
-                            value: result.confidence / 100,
-                            minHeight: 8,
-                            backgroundColor: Colors.grey.shade300,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              result.isHighConfidence
-                                  ? Colors.green
-                                  : Colors.orange,
+                        TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _isEditing = !_isEditing;
+                            });
+                          },
+                          icon: Icon(_isEditing ? Icons.check : Icons.edit),
+                          label: Text(_isEditing ? 'Done' : 'Edit'),
+                          style: TextButton.styleFrom(
+                            backgroundColor: _isEditing
+                                ? Colors.green
+                                : Colors.transparent,
+                            foregroundColor: _isEditing
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.primary,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
                           ),
                         ),
                       ],
                     ),
+
+                    const SizedBox(height: 24),
+
+                    // Item Name
+                    _buildFieldLabel('Item Name'),
+                    const SizedBox(height: 8),
+                    _isEditing
+                        ? TextFormField(
+                            controller: _itemNameController,
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.all(16),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter an item name';
+                              }
+                              return null;
+                            },
+                          )
+                        : _buildFieldValue(_itemNameController.text),
+
+                    const SizedBox(height: 20),
+
+                    // Description
+                    _buildFieldLabel('Description:'),
+                    const SizedBox(height: 8),
+                    _isEditing
+                        ? TextFormField(
+                            controller: _descriptionController,
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.all(16),
+                              hintText:
+                                  'Describe the condition, features, etc.',
+                            ),
+                            maxLines: 3,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter a description';
+                              }
+                              return null;
+                            },
+                          )
+                        : _buildFieldValue(_descriptionController.text),
+
+                    const SizedBox(height: 20),
+
+                    // Starting Price
+                    _buildFieldLabel('Starting Price:'),
+                    const SizedBox(height: 8),
+                    _isEditing
+                        ? TextFormField(
+                            controller: _startingPriceController,
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.all(16),
+                              prefixText: '\$',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d+\.?\d{0,2}'),
+                              ),
+                            ],
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter a starting price';
+                              }
+                              final price = double.tryParse(value);
+                              if (price == null || price <= 0) {
+                                return 'Invalid price';
+                              }
+                              return null;
+                            },
+                          )
+                        : _buildFieldValue(
+                            '\$${_startingPriceController.text}',
+                          ),
+
+                    const SizedBox(height: 20),
+
+                    // Floor Price
+                    _buildFieldLabel('Floor Price:'),
+                    const SizedBox(height: 8),
+                    _isEditing
+                        ? TextFormField(
+                            controller: _floorPriceController,
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.all(16),
+                              prefixText: '\$',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d+\.?\d{0,2}'),
+                              ),
+                            ],
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter a floor price';
+                              }
+                              final floorPrice = double.tryParse(value);
+                              if (floorPrice == null || floorPrice <= 0) {
+                                return 'Invalid price';
+                              }
+                              final startingPrice = double.tryParse(
+                                _startingPriceController.text,
+                              );
+                              if (startingPrice != null &&
+                                  floorPrice > startingPrice) {
+                                return 'Must be ≤ starting price';
+                              }
+                              return null;
+                            },
+                          )
+                        : _buildFieldValue('\$${_floorPriceController.text}'),
+
+                    const SizedBox(height: 20),
+
+                    // Listing Duration
+                    _buildFieldLabel('Listing Duration:'),
+                    const SizedBox(height: 8),
+                    _isEditing
+                        ? DropdownButtonFormField<int>(
+                            value: _selectedDays,
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.all(16),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 1, child: Text('1 day')),
+                              DropdownMenuItem(value: 3, child: Text('3 days')),
+                              DropdownMenuItem(value: 7, child: Text('7 days')),
+                              DropdownMenuItem(
+                                value: 14,
+                                child: Text('14 days'),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedDays = value!;
+                              });
+                            },
+                          )
+                        : _buildFieldValue(
+                            '$_selectedDays day${_selectedDays > 1 ? 's' : ''}',
+                          ),
+
+                    const SizedBox(height: 20),
+
+                    // PayNow Phone Number
+                    _buildFieldLabel('PayNow Phone Number:'),
+                    const SizedBox(height: 8),
+                    _isEditing
+                        ? TextFormField(
+                            controller: _phoneController,
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.all(16),
+                              hintText: '81234567 or +6581234567',
+                            ),
+                            keyboardType: TextInputType.phone,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter your phone number';
+                              }
+                              if (!ItemCreationService.isValidPhoneNumber(
+                                value,
+                              )) {
+                                return 'Invalid phone number (8 digits or +65 format)';
+                              }
+                              return null;
+                            },
+                          )
+                        : _buildFieldValue(_phoneController.text),
+
+                    if (_errorMessage != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _errorMessage!,
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 32),
+
+                    // List My Item Button
+                    ElevatedButton(
+                      onPressed: _createListing,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4169E1), // Royal blue
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'List My Item!',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-
-            // Form Fields
-            const Text(
-              'Listing Details',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-
-            TextFormField(
-              controller: _itemNameController,
-              decoration: const InputDecoration(
-                labelText: 'Item Name *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.shopping_bag),
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter an item name';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            TextFormField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.description),
-                hintText: 'Describe the condition, features, etc.',
-              ),
-              maxLines: 3,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter a description';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _startingPriceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Starting Price *',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.attach_money),
-                      prefixText: '\$',
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d+\.?\d{0,2}'),
-                      ),
-                    ],
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Required';
-                      }
-                      final price = double.tryParse(value);
-                      if (price == null || price <= 0) {
-                        return 'Invalid price';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    controller: _floorPriceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Floor Price *',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.price_check),
-                      prefixText: '\$',
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d+\.?\d{0,2}'),
-                      ),
-                    ],
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Required';
-                      }
-                      final floorPrice = double.tryParse(value);
-                      if (floorPrice == null || floorPrice <= 0) {
-                        return 'Invalid price';
-                      }
-                      final startingPrice = double.tryParse(
-                        _startingPriceController.text,
-                      );
-                      if (startingPrice != null && floorPrice > startingPrice) {
-                        return 'Must be ≤ starting';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            DropdownButtonFormField<int>(
-              value: _selectedDays,
-              decoration: const InputDecoration(
-                labelText: 'Listing Duration',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.calendar_today),
-              ),
-              items: const [
-                DropdownMenuItem(value: 1, child: Text('1 day')),
-                DropdownMenuItem(value: 3, child: Text('3 days')),
-                DropdownMenuItem(value: 7, child: Text('7 days')),
-                DropdownMenuItem(value: 14, child: Text('14 days')),
-              ],
-              onChanged: (value) {
-                setState(() {
-                  _selectedDays = value!;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-
-            TextFormField(
-              controller: _phoneController,
-              decoration: const InputDecoration(
-                labelText: 'PayNow Phone Number *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.phone),
-                hintText: '81234567 or +6581234567',
-              ),
-              keyboardType: TextInputType.phone,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter your phone number';
-                }
-                if (!ItemCreationService.isValidPhoneNumber(value)) {
-                  return 'Invalid phone number (8 digits or +65 format)';
-                }
-                return null;
-              },
-            ),
-
-            if (_errorMessage != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade300),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.error_outline, color: Colors.red),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: Colors.red),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 24),
-
-            // Action Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _retryDetection,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: const Text('Retry Detection'),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    onPressed: _createListing,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: const Text('List Item'),
-                  ),
-                ),
-              ],
             ),
           ],
         ),
@@ -613,19 +673,42 @@ class _SellScreenState extends State<SellScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildFieldLabel(String label) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+        Container(
+          width: 6,
+          height: 6,
+          decoration: const BoxDecoration(
+            color: Colors.black,
+            shape: BoxShape.circle,
+          ),
         ),
         const SizedBox(width: 8),
-        Expanded(child: Text(value, style: const TextStyle(fontSize: 16))),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
       ],
     );
   }
-}
 
-enum _ScreenState { ready, triggering, detecting, showingResults, creating }
+  Widget _buildFieldValue(String value) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        value,
+        style: const TextStyle(fontSize: 16, color: Colors.black87),
+      ),
+    );
+  }
+}
