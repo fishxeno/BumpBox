@@ -11,7 +11,7 @@ import detectObjectRouter from "./routes/detectObject.js";
 import db from "./dbConnection.js";
 import Stripe from "stripe";
 import cors from "cors";
-import { addDaysAndFormat } from "./utils/helperfunctions/helperfunctions.js";
+import { addDaysAndFormat } from "./utils/helperfunctions.js";
 import { setCaptureTrigger, getAndResetCaptureTrigger, getLatestDetection, storeDetection, latestDetection } from './storage.js';
 import mqtt from "mqtt";
 
