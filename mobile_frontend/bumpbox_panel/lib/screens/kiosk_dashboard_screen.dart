@@ -11,6 +11,7 @@ import '../services/mock_data_service.dart';
 import '../services/pricing_service.dart';
 import '../services/storage_service.dart';
 import 'attention_monitor_screen.dart';
+import 'sell_screen.dart';
 
 class KioskDashboardScreen extends StatefulWidget {
   const KioskDashboardScreen({super.key});
@@ -373,13 +374,39 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       body: _buildBody(),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _fastForwardOneDay,
-        icon: const Icon(Icons.fast_forward),
-        label: Text(_daysFastForwarded > 0 ? '+$_daysFastForwarded d' : 'FF'),
-        backgroundColor: Colors.orange.shade600,
-        foregroundColor: Colors.white,
-        tooltip: 'Fast Forward 1 Day (Testing)',
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Sell Item Button (primary action)
+          FloatingActionButton.extended(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SellScreen()),
+              );
+            },
+            icon: const Icon(Icons.add_shopping_cart),
+            label: const Text('Sell Item'),
+            backgroundColor: Colors.green.shade600,
+            foregroundColor: Colors.white,
+            tooltip: 'Sell a new item',
+            heroTag: 'sell_button',
+          ),
+          const SizedBox(height: 16),
+          // Fast Forward Button (testing)
+          FloatingActionButton.extended(
+            onPressed: _fastForwardOneDay,
+            icon: const Icon(Icons.fast_forward),
+            label: Text(
+              _daysFastForwarded > 0 ? '+$_daysFastForwarded d' : 'FF',
+            ),
+            backgroundColor: Colors.orange.shade600,
+            foregroundColor: Colors.white,
+            tooltip: 'Fast Forward 1 Day (Testing)',
+            heroTag: 'fastforward_button',
+          ),
+        ],
       ),
     );
   }

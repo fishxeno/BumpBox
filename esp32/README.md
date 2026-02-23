@@ -6,7 +6,7 @@ Camera module for the BumpBox smart locker. Captures a photo of the item inside 
 
 - **AI-Thinker ESP32-CAM** (with OV2640 camera)
 - **ESP32-CAM-MB base board** (micro-USB programmer — no FTDI adapter needed)
-- **Push button** (momentary, normally open)
+- **Push button** (momentary, normally open) — optional, can use Serial command instead
 - **2x jumper wires** (for button wiring)
 
 ### Wiring
@@ -19,44 +19,43 @@ No external pull-up resistor needed — the code uses the ESP32's internal pull-
 
 Plug the ESP32-CAM into the MB base board, then connect via micro-USB to your computer.
 
-## Software Setup
+## Software Setup (PlatformIO)
 
-### 1. Install Arduino IDE
+### 1. Install PlatformIO
 
-Download Arduino IDE 2.x from https://www.arduino.cc/en/software
+Install the **PlatformIO IDE** extension in VS Code (search "PlatformIO IDE" in Extensions marketplace).
 
-### 2. Add ESP32 Board Package
+### 2. Build
 
-1. Open Arduino IDE
-2. Go to **File > Preferences**
-3. In "Additional Board Manager URLs", add:
-   ```
-   https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-   ```
-4. Go to **Tools > Board > Boards Manager**
-5. Search **"esp32"** and install **"esp32 by Espressif Systems"**
+Open a terminal in VS Code and run:
 
-### 3. Install ArduinoJson Library
+```bash
+cd esp32/bumpbox_camera
+pio run
+```
 
-1. Go to **Tools > Manage Libraries**
-2. Search **"ArduinoJson"** by Benoit Blanchon
-3. Install (version 6.x or 7.x both work)
+First time takes ~2 minutes (downloads ESP32 toolchain + ArduinoJson automatically).
+Wait for `SUCCESS`.
 
-### 4. Board Settings
+### 3. Upload
 
-| Setting | Value |
-|---------|-------|
-| Board | **AI Thinker ESP32-CAM** |
-| CPU Frequency | 240MHz |
-| Flash Frequency | 80MHz |
-| Flash Mode | QIO |
-| Partition Scheme | Huge APP (3MB No OTA/1MB SPIFFS) |
-| Upload Speed | 921600 |
-| Port | *(select your CH340G COM port)* |
+```bash
+pio run --target upload
+```
+
+If COM port not found, check Device Manager for CH340 port, or unplug/replug USB.
+
+### 4. Serial Monitor
+
+```bash
+pio device monitor
+```
+
+Press the **RST** button on the ESP32-CAM-MB board. Baud rate is 115200 (configured in `platformio.ini`).
 
 ## Configuration
 
-Open `bumpbox_camera.ino` and edit these lines at the top:
+Open `src/main.cpp` and edit these lines at the top:
 
 ```cpp
 const char* WIFI_SSID     = "YOUR_WIFI_SSID";       // Your WiFi network name
@@ -65,16 +64,6 @@ const bool  USE_MOCK      = true;                    // true = test mode, false 
 ```
 
 **Mock mode** (`USE_MOCK = true`): The server returns a fake detection result without calling Google Vision API. Use this for testing the hardware connection.
-
-## Upload & Run
-
-1. Connect the ESP32-CAM-MB to your computer via micro-USB
-2. Select the correct **Port** in Tools menu
-3. Click **Upload** (right arrow button)
-4. After upload completes, open **Serial Monitor** (magnifying glass icon)
-5. Set baud rate to **115200**
-6. Press the **RST** button on the ESP32-CAM-MB board
-7. You should see the startup banner and "Waiting for trigger..."
 
 ## Usage
 

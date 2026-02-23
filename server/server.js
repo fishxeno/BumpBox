@@ -11,7 +11,8 @@ import detectObjectRouter from "./routes/detectObject.js";
 import db from "./dbConnection.js";
 import Stripe from "stripe";
 import cors from "cors";
-import { addDaysAndFormat } from "./utils/helperfunctions.js";
+import { addDaysAndFormat } from "./utils/helperfunctions/helperfunctions.js";
+import { setCaptureTrigger, getAndResetCaptureTrigger, getLatestDetection, storeDetection, latestDetection } from './storage.js';
 import mqtt from "mqtt";
 
 const mqttClient = mqtt.connect("mqtt://broker.hivemq.com");
@@ -98,6 +99,60 @@ app.use(urlencoded({ extended: true }));
 app.use(methodOverride());
 app.use(detectObjectRouter);
 
+// Trigger ESP32 camera capture (called by Flutter app)
+app.post('/api/locker/trigger-capture', (req, res) => {
+    try {
+        const lockerId = req.body.lockerId || 'locker1';
+        setCaptureTrigger(lockerId);
+        console.log(`[trigger-capture] Capture triggered for ${lockerId}`);
+        return res.status(200).json({ success: true, message: 'Capture triggered', lockerId });
+    } catch (error) {
+        console.error('[trigger-capture] Error:', error.message);
+        return res.status(500).json({ error: 'Failed to trigger capture' });
+    }
+});
+
+// ESP32 polling endpoint to check if capture should be triggered
+app.get('/api/locker/capture-trigger', (req, res) => {
+    try {
+        const result = getAndResetCaptureTrigger();
+        if (result.shouldCapture) {
+            console.log(`[capture-trigger] ESP32 acknowledged capture trigger for ${result.lockerId}`);
+        }
+        return res.status(200).json(result);
+    } catch (error) {
+        console.error('[capture-trigger] Error:', error.message);
+        return res.status(500).json({ error: 'Failed to check trigger' });
+    }
+});
+
+// Get latest detection result (polled by Flutter app)
+app.get('/api/detections/latest', (req, res) => {
+    try {
+        const sinceTimestamp = req.query.since;
+        const result = getLatestDetection(sinceTimestamp);
+        return res.status(200).json(result);
+    } catch (error) {
+        console.error('[detections/latest] Error:', error.message);
+        return res.status(500).json({ error: 'Failed to fetch detection' });
+    }
+});
+
+// Get latest captured image (polled by Flutter app)
+app.get('/api/detections/latest-image', (req, res) => {
+    try {
+        if (!latestDetection.imageBuffer) {
+            return res.status(404).json({ error: 'No image available' });
+        }
+        res.set('Content-Type', 'image/jpeg');
+        res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+        return res.send(latestDetection.imageBuffer);
+    } catch (error) {
+        console.error('[detections/latest-image] Error:', error.message);
+        return res.status(500).json({ error: 'Failed to fetch image' });
+    }
+});
+
 //get item, for esp polling, we will only return the latest item, as the esp will only display the latest item
 app.get("/api/item", async (req, res) => {
     try {
@@ -120,6 +175,67 @@ app.get("/api/item", async (req, res) => {
     } catch (error) {
         console.error("Get items error:", error.stack);
         return res.status(500).json({ error: "Error fetching items" });
+    }
+});
+
+// TEST ENDPOINT: Simulate ESP32 detection without hardware
+app.post('/api/test/simulate-detection', (req, res) => {
+    try {
+        const lockerId = req.body.lockerId || 'locker1';
+        const itemType = req.body.itemType || 'Headphones';
+        
+        // Mock detection results based on item type
+        const mockDetections = {
+            'Headphones': {
+                label: 'Headphones',
+                category: 'Electronics',
+                minPrice: 10,
+                maxPrice: 80,
+                confidence: 95
+            },
+            'Laptop': {
+                label: 'Laptop',
+                category: 'Electronics',
+                minPrice: 150,
+                maxPrice: 600,
+                confidence: 92
+            },
+            'Smartphone': {
+                label: 'Smartphone',
+                category: 'Electronics',
+                minPrice: 50,
+                maxPrice: 400,
+                confidence: 88
+            },
+            'Book': {
+                label: 'Book',
+                category: 'Books',
+                minPrice: 2,
+                maxPrice: 15,
+                confidence: 85
+            },
+            'Watch': {
+                label: 'Watch',
+                category: 'Accessories',
+                minPrice: 20,
+                maxPrice: 150,
+                confidence: 90
+            }
+        };
+        
+        const detection = mockDetections[itemType] || mockDetections['Headphones'];
+        storeDetection(detection, lockerId);
+        
+        console.log(`[TEST] Simulated detection: ${detection.label} for ${lockerId}`);
+        
+        return res.status(200).json({
+            success: true,
+            message: 'Simulated detection stored',
+            detection
+        });
+    } catch (error) {
+        console.error('[TEST] Error:', error.message);
+        return res.status(500).json({ error: 'Failed to simulate detection' });
     }
 });
 
