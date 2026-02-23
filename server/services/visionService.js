@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 export async function detectLabels(imageBuffer) {
   const apiKey = process.env.GOOGLE_VISION_API_KEY;
   if (!apiKey) {

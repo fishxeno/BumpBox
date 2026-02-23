@@ -11,7 +11,7 @@ import detectObjectRouter from "./routes/detectObject.js";
 import db from "./dbConnection.js";
 import Stripe from "stripe";
 import cors from "cors";
-import { addDaysAndFormat } from "./utils.js";
+import { addDaysAndFormat } from "./utils/helperfunctions.js";
 
 const app = express();
 const __dirname = resolve();
