@@ -1,6 +1,7 @@
 /// API configuration for BumpBox backend integration
 class ApiConfig {
   /// Base URL for the backend server
+  // static const String baseUrl = 'http://bumpbox-env-1.eba-43hmmxwt.ap-southeast-1.elasticbeanstalk.com'; # prod
   static const String baseUrl = 'http://10.192.1.2:8080';
 
   /// Endpoint to trigger ESP32 camera capture
@@ -14,6 +15,9 @@ class ApiConfig {
 
   /// Endpoint to create a new item listing
   static const String createItemEndpoint = '/api/item';
+
+  /// Endpoint to get the latest item listing
+  static const String getItemEndpoint = '/api/item';
 
   /// Polling interval for checking detection results
   static const Duration pollInterval = Duration(seconds: 2);
@@ -35,4 +39,7 @@ class ApiConfig {
 
   /// Full URL for creating items
   static String get createItemUrl => '$baseUrl$createItemEndpoint';
+
+  /// Full URL for getting the latest item
+  static String get getItemUrl => '$baseUrl$getItemEndpoint';
 }

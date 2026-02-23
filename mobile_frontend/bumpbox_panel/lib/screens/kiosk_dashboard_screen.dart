@@ -7,6 +7,7 @@ import '../models/attention_state.dart';
 import '../models/item.dart';
 import '../services/attention_detector.dart';
 import '../services/camera_service.dart';
+import '../services/item_api_service.dart';
 import '../services/mock_data_service.dart';
 import '../services/pricing_service.dart';
 import '../services/storage_service.dart';
@@ -202,7 +203,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
     );
   }
 
-  /// Load item and surge counts from storage, or create new from mock
+  /// Load item and surge counts from storage, API, or create new from mock
   Future<void> _loadOrCreateItem() async {
     // Try to load saved item
     final savedItem = await StorageService.loadItem();
@@ -215,13 +216,72 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
       _onlineSurgeCount = savedCounts['onlineSurgeCount'] ?? 0;
       debugPrint('💾 Loaded saved item: ${_currentItem.name}');
     } else {
-      // No saved state, create new from mock
-      _currentItem = MockDataService.getMockItem();
-      await StorageService.saveItem(_currentItem);
-      debugPrint('🆕 Created new mock item: ${_currentItem.name}');
+      // No saved state, try to fetch from backend API
+      debugPrint('📡 Fetching item from backend API...');
+      final apiItem = await ItemApiService.fetchLatestItem();
+      
+      if (apiItem != null) {
+        _currentItem = apiItem;
+        await StorageService.saveItem(_currentItem);
+        debugPrint('✅ Loaded item from API: ${_currentItem.name}');
+      } else {
+        // API failed or no item, fall back to mock data
+        debugPrint('⚠️ API fetch failed, using mock data');
+        _currentItem = MockDataService.getMockItem();
+        await StorageService.saveItem(_currentItem);
+        debugPrint('🆕 Created new mock item: ${_currentItem.name}');
+      }
     }
 
     _updatePrices();
+  }
+
+  /// Manually refresh item from backend API
+  /// 
+  /// This method fetches the latest item from the backend and updates
+  /// the display. Useful for testing or when a new item is listed.
+  Future<void> _refreshItemFromAPI() async {
+    debugPrint('🔄 Manually refreshing item from API...');
+    
+    final apiItem = await ItemApiService.fetchLatestItem();
+    
+    if (apiItem != null) {
+      setState(() {
+        _currentItem = apiItem;
+        // Reset surge counts for new item
+        _surgeCount = 0;
+        _physicalSurgeCount = 0;
+        _onlineSurgeCount = 0;
+      });
+      
+      await StorageService.saveItem(_currentItem);
+      await _saveSurgeCounts();
+      _updatePrices();
+      
+      debugPrint('✅ Refreshed item from API: ${_currentItem.name}');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Loaded: ${_currentItem.name}'),
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.green.shade700,
+          ),
+        );
+      }
+    } else {
+      debugPrint('❌ Failed to refresh item from API');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Failed to load item from backend'),
+            duration: Duration(seconds: 3),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   /// Save surge counts to storage
@@ -405,6 +465,17 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
             foregroundColor: Colors.white,
             tooltip: 'Fast Forward 1 Day (Testing)',
             heroTag: 'fastforward_button',
+          ),
+          const SizedBox(height: 16),
+          // Refresh Item Button (fetch latest from backend)
+          FloatingActionButton.extended(
+            onPressed: _refreshItemFromAPI,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh'),
+            backgroundColor: Colors.blue.shade600,
+            foregroundColor: Colors.white,
+            tooltip: 'Refresh item from backend',
+            heroTag: 'refresh_button',
           ),
         ],
       ),
