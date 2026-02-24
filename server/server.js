@@ -130,7 +130,9 @@ app.get('/api/locker/capture-trigger', (req, res) => {
 app.get('/api/detections/latest', (req, res) => {
     try {
         const sinceTimestamp = req.query.since;
+        console.log(`[detections/latest] Request with since=${sinceTimestamp}`);
         const result = getLatestDetection(sinceTimestamp);
+        console.log(`[detections/latest] Returning: ${result.detection ? result.detection.label : 'null'}`);
         return res.status(200).json(result);
     } catch (error) {
         console.error('[detections/latest] Error:', error.message);

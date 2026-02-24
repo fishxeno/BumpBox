@@ -34,7 +34,7 @@ export function setCaptureTrigger(lockerId) {
 export function getAndResetCaptureTrigger() {
   const shouldCapture = captureTrigger.triggered;
   const lockerId = captureTrigger.lockerId || 'locker1';
-  
+
   if (captureTrigger.triggered) {
     captureTrigger.triggered = false;
   }
@@ -51,6 +51,7 @@ export function storeDetection(detection, lockerId = 'locker1', imageBuffer = nu
   latestDetection.timestamp = timestamp;
   latestDetection.lockerId = lockerId;
   latestDetection.imageBuffer = imageBuffer;
+  console.log(`[storage] Detection stored at ${timestamp} for ${lockerId}: ${detection.label}`);
   
   // Optional: Add TTL to clear old detections after 5 minutes
   setTimeout(() => {
@@ -68,14 +69,20 @@ export function storeDetection(detection, lockerId = 'locker1', imageBuffer = nu
  * Optionally filter by timestamp (return null if not newer than 'since')
  */
 export function getLatestDetection(sinceTimestamp = null) {
+  console.log(`[storage] getLatestDetection called with since=${sinceTimestamp}`);
+  console.log(`[storage] Current detection: timestamp=${latestDetection.timestamp}, label=${latestDetection.result?.label}`);
+  
   if (!latestDetection.result) {
+    console.log(`[storage] No detection stored, returning null`);
     return { detection: null };
   }
   
   if (sinceTimestamp && latestDetection.timestamp) {
     const sinceDate = new Date(sinceTimestamp);
     const detectionDate = new Date(latestDetection.timestamp);
+    console.log(`[storage] Comparing: detection ${detectionDate.toISOString()} vs since ${sinceDate.toISOString()}`);
     if (detectionDate <= sinceDate) {
+      console.log(`[storage] Detection too old, returning null`);
       return { detection: null };
     }
   }
