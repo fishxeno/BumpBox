@@ -145,7 +145,7 @@ app.get('/api/detections/latest-image', (req, res) => {
     try {
         if (!latestDetection.imageBuffer) {
             return res.status(404).json({ error: 'No image available' });
-        }
+        } 
         res.set('Content-Type', 'image/jpeg');
         res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
         return res.send(latestDetection.imageBuffer);
