@@ -107,19 +107,18 @@ app.use(detectObjectRouter);
 
 //return within 5 mins
 //lock locker
-app.get("/api/return", (req, res) => {
+app.get("/api/return", async (req, res) => {
     try {
         cancelCapture();
-        const [rows] = db.execute(`SELECT itemid FROM items ORDER BY itemid DESC LIMIT 1`);
+        const [rows] = await db.execute(`SELECT itemid FROM items ORDER BY itemid DESC LIMIT 1`);
         const itemid = rows[0].itemid;
         const query = `UPDATE items SET sale_status = 0 WHERE itemid = ?`;
-        db.execute(query, [itemid]);
+        await db.execute(query, [itemid]);
         res.status(200).json({ message: "item returned", status: false });
     } catch (error) {
         console.error('return-item Error:', error.message);
         return res.status(500).json({ error: 'Failed to return item', error });
     }
-    
 });
 
 // Trigger ESP32 camera capture (called by Flutter app)
