@@ -63,9 +63,7 @@ class _SellScreenState extends State<SellScreen> {
       // Capture timestamp BEFORE triggering to avoid race condition
       // Add buffer for clock skew between devices
       // Convert to UTC to match server's UTC timestamps
-      final startTime = DateTime.now().toUtc().subtract(
-        const Duration(seconds: 5),
-      );
+      final startTime = DateTime.now().toUtc();
       print(
         '[SellScreen] Starting detection with timestamp: ${startTime.toIso8601String()}',
       );
