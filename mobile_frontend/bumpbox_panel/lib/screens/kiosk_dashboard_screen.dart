@@ -234,13 +234,6 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
     }
 
     if (savedItem != null) {
-      // Check if saved item is sold
-      if (savedItem.isSold == true) {
-        debugPrint('💾 Saved item was sold, transitioning to empty state');
-        await _transitionToEmptyState();
-        return;
-      }
-
       _currentItem = savedItem;
       _lockerState = LockerState.available;
       _surgeCount = savedCounts['surgeCount'] ?? 0;
@@ -250,23 +243,22 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
     } else {
       // No saved state, try to fetch from backend API
       debugPrint('📡 Fetching item from backend API...');
-      final apiItem = await ItemApiService.fetchLatestItem();
+      final result = await ItemApiService.fetchLatestItem();
 
-      if (apiItem != null) {
-        // Check if the fetched item is sold
-        if (apiItem.isSold == true) {
-          debugPrint('📡 API returned sold item, transitioning to empty state');
-          await _transitionToEmptyState();
-          return;
-        }
-
-        _currentItem = apiItem;
+      if (result.isEmpty) {
+        // Backend confirmed locker is empty
+        debugPrint('📡 Backend confirmed empty locker');
+        await _transitionToEmptyState();
+        return;
+      } else if (result.isAvailable) {
+        // Item available
+        _currentItem = result.item!;
         _lockerState = LockerState.available;
         await StorageService.saveItem(_currentItem!);
         debugPrint('✅ Loaded item from API: ${_currentItem!.name}');
       } else {
-        // API failed or no item, fall back to mock data
-        debugPrint('⚠️ API fetch failed, using mock data');
+        // API error, fall back to mock data
+        debugPrint('⚠️ API fetch error: ${result.message}, using mock data');
         _currentItem = MockDataService.getMockItem();
         _lockerState = LockerState.available;
         await StorageService.saveItem(_currentItem!);
@@ -289,28 +281,26 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
   Future<void> _refreshItemFromAPI() async {
     debugPrint('🔄 Manually refreshing item from API...');
 
-    final apiItem = await ItemApiService.fetchLatestItem();
+    final result = await ItemApiService.fetchLatestItem();
 
-    if (apiItem != null) {
-      // Check if the item is sold
-      if (apiItem.isSold == true) {
-        debugPrint('🔄 Refreshed item is sold, transitioning to empty state');
-        await _transitionToEmptyState();
+    if (result.isEmpty) {
+      // Backend confirmed locker is empty
+      debugPrint('🔄 Backend confirmed empty locker');
+      await _transitionToEmptyState();
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Item sold! Locker is now empty'),
-              duration: Duration(seconds: 3),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-        return;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Item sold! Locker is now empty'),
+            duration: Duration(seconds: 3),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
-
+      return;
+    } else if (result.isAvailable) {
       setState(() {
-        _currentItem = apiItem;
+        _currentItem = result.item!;
         _lockerState = LockerState.available;
         // Reset surge counts for new item
         _surgeCount = 0;
@@ -337,7 +327,8 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
         );
       }
     } else {
-      debugPrint('❌ Failed to refresh item from API');
+      // Error
+      debugPrint('❌ Failed to refresh item from API: ${result.message}');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -366,11 +357,11 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
         if (mounted &&
             _lockerState == LockerState.available &&
             _currentItem != null) {
-          final apiItem = await ItemApiService.fetchLatestItem();
+          final result = await ItemApiService.fetchLatestItem();
 
-          if (apiItem != null && apiItem.isSold == true) {
+          if (result.isEmpty) {
             debugPrint(
-              '🔔 Polling detected item sold! Transitioning to empty state',
+              '🔔 Polling detected empty locker! Transitioning to empty state',
             );
             await _transitionToEmptyState();
 

@@ -2,15 +2,18 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../models/item.dart';
+import '../models/item_fetch_result.dart';
 import '../config/pricing_config.dart';
 
 /// Service for fetching items from the backend API
 class ItemApiService {
   /// Fetch the latest listed item from the backend
   ///
-  /// Returns null if no item is found or an error occurs.
-  /// The backend returns the most recently listed item.
-  static Future<Item?> fetchLatestItem() async {
+  /// Returns ItemFetchResult indicating:
+  /// - itemAvailable: Item exists and can be purchased
+  /// - emptyLocker: Backend confirmed locker is empty (sold with specific message)
+  /// - error: An error occurred
+  static Future<ItemFetchResult> fetchLatestItem() async {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.getItemUrl),
@@ -18,9 +21,10 @@ class ItemApiService {
       );
 
       if (response.statusCode == 404) {
-        // No item found
-        print('[ItemApiService] No item found in backend');
-        return null;
+        // No item found - but this is not necessarily "empty locker"
+        // Keep showing current item if we have one
+        print('[ItemApiService] No item found in backend (404)');
+        return ItemFetchResult.error('No item found');
       }
 
       if (response.statusCode != 200) {
@@ -38,18 +42,31 @@ class ItemApiService {
       //   "data": { item fields }
       // }
 
+      final status = jsonData['status'];
+      final message = jsonData['message']?.toString() ?? '';
+
+      // Check for the specific "sold" message (truly sold, locker is empty)
+      if (status == true && message == 'Item is sold with status sold') {
+        print('[ItemApiService] ✅ Item sold, locker is now empty');
+        return ItemFetchResult.emptyLocker();
+      }
+
+      // If status is true with "empty locker" message, item is in test mode
+      // Show the item with countdown timer visible
       if (jsonData['data'] == null) {
         print('[ItemApiService] No item data in response');
-        return null;
+        return ItemFetchResult.error('No item data');
       }
 
       // Extract the status field to determine if item is sold
-      final isSold = jsonData['status'] == true;
+      // Note: "Item is sold with status empty locker" means test mode, not truly sold
+      final isSold = status == true && message == 'Item is sold with status sold';
 
-      return _parseItemFromBackend(jsonData['data'], isSold: isSold);
+      final item = _parseItemFromBackend(jsonData['data'], isSold: isSold);
+      return ItemFetchResult.available(item);
     } catch (e) {
       print('[ItemApiService] Error fetching item: $e');
-      return null;
+      return ItemFetchResult.error(e.toString());
     }
   }
 
