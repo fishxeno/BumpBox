@@ -60,7 +60,8 @@ class ItemApiService {
 
       // Extract the status field to determine if item is sold
       // Note: "Item is sold with status empty locker" means test mode, not truly sold
-      final isSold = status == true && message == 'Item is sold with status sold';
+      final isSold =
+          status == true && message == 'Item is sold with status sold';
 
       final item = _parseItemFromBackend(jsonData['data'], isSold: isSold);
       return ItemFetchResult.available(item);
