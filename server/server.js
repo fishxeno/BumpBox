@@ -50,17 +50,23 @@ const cancelCapture = () => {
     }
 }
 
+let testing_intent;
 //webhook endpoint for stripe
 //update item to sold when payment is successful
 app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
-    const event = stripe.webhooks.constructEvent(
-        req.body,
-        req.headers["stripe-signature"],
-        process.env.STRIPE_WEBHOOK_KEY,
-    );
-    const [rows] = await db.execute(
-            `SELECT * FROM items ORDER BY itemid DESC LIMIT 1`,
+    let event;
+    if (req.body.testing_intent || req.body.testing_intent === false) {
+        testing_intent = req.body.testing_intent;
+        console.log("Received testing intent:", testing_intent);
+        res.status(200).json({ message: "Testing intent received" });
+        return;
+    }
+    event = stripe.webhooks.constructEvent(
+            req.body,
+            req.headers["stripe-signature"],
+            process.env.STRIPE_WEBHOOK_KEY,
         );
+    const [rows] = await db.execute(`SELECT * FROM items ORDER BY itemid DESC LIMIT 1`);
     if (event.type === "payment_intent.succeeded") {
         // meaning money is charged successfully, update item to sold
         const query = `UPDATE items SET sale_status = 2 WHERE itemid = ?`;
@@ -86,7 +92,15 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
                 paymentId: paymentIntentId
             })
         );
-        scheduleCapture(paymentIntentId);
+        if (testing_intent === true) {
+            console.log("Using testing intent for scheduling capture:", testing_intent);
+            scheduleCapture(paymentIntentId);
+            testing_intent = undefined; // reset after use
+        } else {
+            console.log("capturing payment immediately for session:", session.id);
+            await stripe.paymentIntents.capture(paymentIntentId);
+            testing_intent = undefined; // reset just in case
+        }
         //open locker for user to take out
         const query = `UPDATE items SET sale_status = 1 WHERE itemid = ?`;
         await db.execute(query, [rows[0].itemid]);
