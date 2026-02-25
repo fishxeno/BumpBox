@@ -1377,55 +1377,119 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                     onPressed: () async {
                       HapticFeedback.mediumImpact();
 
-                      // Fetch latest item data from backend
-                      debugPrint(
-                        '🛒 Buy button pressed, fetching latest item...',
+                      // Show loading indicator
+                      if (!mounted) return;
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => const Center(
+                          child: Card(
+                            child: Padding(
+                              padding: EdgeInsets.all(32.0),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircularProgressIndicator(),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'Preparing payment...',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                       );
-                      final latestItem = await ItemApiService.fetchLatestItem();
 
-                      if (latestItem == null) {
+                      try {
+                        // Update price to backend and get new payment link
+                        debugPrint(
+                          '🛒 Buy button pressed, syncing price \$${_currentPrice.toStringAsFixed(2)}...',
+                        );
+                        final updatedItem = await ItemApiService.updateItemPrice(
+                          _currentPrice,
+                        );
+
+                        // Close loading indicator
+                        if (mounted) {
+                          Navigator.of(context).pop();
+                        }
+
+                        if (updatedItem == null) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  '❌ Failed to prepare payment',
+                                ),
+                                duration: Duration(seconds: 3),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        // Check if payment link exists
+                        if (updatedItem.paymentLink == null ||
+                            updatedItem.paymentLink!.isEmpty) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  '❌ Payment link not available',
+                                ),
+                                duration: Duration(seconds: 3),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        // Update local state with new payment link
+                        setState(() {
+                          _currentItem = updatedItem;
+                        });
+                        await StorageService.saveItem(_currentItem!);
+
+                        debugPrint(
+                          '✅ Price synced: \$${_currentPrice.toStringAsFixed(2)}, showing payment dialog',
+                        );
+
+                        // Show payment dialog with updated item
+                        if (!mounted) return;
+                        final paymentSuccessful = await showPaymentDialog(
+                          context,
+                          item: updatedItem,
+                          currentPrice: _currentPrice,
+                        );
+
+                        // Refresh item if payment was successful
+                        if (paymentSuccessful && mounted) {
+                          debugPrint(
+                            '✅ Payment successful, refreshing item...',
+                          );
+                          await _refreshItemFromAPI();
+                        }
+                      } catch (e) {
+                        // Close loading indicator if still open
+                        if (mounted && Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        }
+
+                        debugPrint('❌ Error preparing payment: $e');
+
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                '❌ Failed to load item information',
-                              ),
-                              duration: Duration(seconds: 3),
+                            SnackBar(
+                              content: Text('❌ Error: $e'),
+                              duration: const Duration(seconds: 3),
                               backgroundColor: Colors.red,
                             ),
                           );
                         }
-                        return;
-                      }
-
-                      // Check if payment link exists
-                      if (latestItem.paymentLink == null ||
-                          latestItem.paymentLink!.isEmpty) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                '❌ Payment link not available for this item',
-                              ),
-                              duration: Duration(seconds: 3),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                        return;
-                      }
-
-                      // Show payment dialog
-                      final paymentSuccessful = await showPaymentDialog(
-                        context,
-                        item: latestItem,
-                        currentPrice: _currentPrice,
-                      );
-
-                      // Refresh item if payment was successful
-                      if (paymentSuccessful && mounted) {
-                        debugPrint('✅ Payment successful, refreshing item...');
-                        await _refreshItemFromAPI();
                       }
                     },
                     icon: const Icon(Icons.shopping_cart, size: 20),
