@@ -100,7 +100,7 @@ app.use(detectObjectRouter);
 
 //return within 5 mins
 //lock locker
-app.get("/return", (req, res) => {
+app.get("/api/return", (req, res) => {
     try {
         cancelCapture();
         const [rows] = db.execute(`SELECT itemid FROM items ORDER BY itemid DESC LIMIT 1`);
