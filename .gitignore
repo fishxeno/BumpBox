@@ -28,6 +28,7 @@ server/credentials/
 
 # ESP32 PlatformIO build artifacts
 esp32/bumpbox_camera/.pio/
+esp32/bumpbox_s3/.pio/
 
 # Debug captures
 server/debug_capture.jpg
