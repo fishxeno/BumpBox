@@ -66,6 +66,9 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
         const query = `UPDATE items SET sale_status = 2 WHERE itemid = ?`;
         await db.execute(query, [rows[0].itemid]);
         await stripe.paymentLinks.update(rows[0].paymentLinkid, { active: false }); //disable payment link after successful payment
+        //TODO: store the successful transaction in database for paynow to seller purpose
+        
+
         res.status(200).json({ message: "Payment succeeded and item marked as sold", status: false });
 
     } else if (event.type === "checkout.session.completed") {
@@ -182,7 +185,7 @@ app.get("/api/item", async (req, res) => {
         if (rows[0].sale_status == 1 || rows[0].sale_status == 2) {
             return res
                 .status(200)
-                .json({ status: true, message: `Item is sold with status ${rows[0].sale_status === 2 ? 'empty locker' : 'sold'}`, data: rows[0] });
+                .json({ status: true, message: `Item is sold with status ${rows[0].sale_status == 2 ? 'sold' : 'empty locker'}`, data: rows[0] });
         }
         if (rows[0].sale_status == 0) {
             return res
