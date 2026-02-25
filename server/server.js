@@ -13,15 +13,6 @@ import Stripe from "stripe";
 import cors from "cors";
 import { addDaysAndFormat } from "./utils/helperfunctions.js";
 import { setCaptureTrigger, getAndResetCaptureTrigger, getLatestDetection, storeDetection, latestDetection } from './storage.js';
-import mqtt from "mqtt";
-
-const mqttClient = mqtt.connect("mqtt://broker.hivemq.com");
-mqttClient.on("connect", () => {
-    console.log("Connected to MQTT broker");
-});
-mqttClient.on("error", (err) => {
-    console.error("MQTT connection error:", err);
-});
 
 const app = express();
 const __dirname = resolve();
@@ -57,11 +48,10 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
     const signature = req.headers["stripe-signature"];
     if (!signature) {
         const parsed = JSON.parse(req.body.toString());
-        if (parsed.testing_intent !== undefined) {
+        if (parsed.testing_intent !== undefined) {//if the testing_intent exists
             testing_intent = parsed.testing_intent;
             console.log("Received testing intent (no signature):", testing_intent);
             return res.status(200).json({ message: "Testing intent received (no signature)" });
-            
         }
         return res.status(400).json({ error: "there is no stripe signature and testing_intent is undefined" });
     }
@@ -83,19 +73,12 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
         const ourCut = Math.round((((amount * 0.966 - 50)*0.9975)-50) * 0.035) / 100;
         const query2 = `INSERT INTO users (phone, amount_payable, our_cut) VALUES (?, ?, ?)`;
         await db.execute(query2, [rows[0].phone, amountAfterFeesAndCut, ourCut]);
-        res.status(200).json({ message: "Payment succeeded and item marked as sold", status: false });
+        return res.status(200).json({ message: "Payment succeeded and item marked as sold", status: false });
 
     } else if (event.type === "checkout.session.completed") {
         // meaning checkout is completed, but money is not charged yet, we will capture the payment after 5 minutes
         const session = event.data.object;
         const paymentIntentId = session.payment_intent;
-        mqttClient.publish(
-            "esp32/door1/alayerofsecurity/unlock",
-            JSON.stringify({
-                action: "unlock",
-                paymentId: paymentIntentId
-            })
-        );
         if (testing_intent === true) {
             console.log("Using testing intent for scheduling capture:", testing_intent);
             scheduleCapture(paymentIntentId);
@@ -108,9 +91,9 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
         //open locker for user to take out
         const query = `UPDATE items SET sale_status = 1 WHERE itemid = ?`;
         await db.execute(query, [rows[0].itemid]);
-        res.status(200).json({ message: "Checkout completed, locker unlocked, capture scheduled", status: true });
+        return res.status(200).json({ message: "Checkout completed, locker unlocked, capture scheduled", status: true });
     }
-    res.sendStatus(200);
+    return res.sendStatus(200);
 });
 
 app.use(
