@@ -49,7 +49,7 @@ const cancelCapture = () => {
         captureTimeout = null;
     }
 }
-
+ 
 let testing_intent;
 //webhook endpoint for stripe
 //update item to sold when payment is successful
