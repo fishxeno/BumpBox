@@ -66,9 +66,13 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
         const query = `UPDATE items SET sale_status = 2 WHERE itemid = ?`;
         await db.execute(query, [rows[0].itemid]);
         await stripe.paymentLinks.update(rows[0].paymentLinkid, { active: false }); //disable payment link after successful payment
-        //TODO: store the successful transaction in database for paynow to seller purpose
-        
-
+        // store the successful transaction in database for paynow to seller purpose
+        const amount = event.data.object.amount_received;
+        // deduct 3.4% + 50 cents Stripe fees, then deduct 0.25% + 50 cents for pay out fees then deduct 3.5% for our cut, then convert to dollars from cents
+        const amountAfterFeesAndCut = Math.round((((amount * 0.966 - 50)*0.9975)-50) * 0.965) / 100;
+        const ourCut = Math.round((((amount * 0.966 - 50)*0.9975)-50) * 0.035) / 100;
+        const query2 = `INSERT INTO users (phone, amount_payable, our_cut) VALUES (?, ?, ?)`;
+        await db.execute(query2, [rows[0].phone, amountAfterFeesAndCut, ourCut]);
         res.status(200).json({ message: "Payment succeeded and item marked as sold", status: false });
 
     } else if (event.type === "checkout.session.completed") {
