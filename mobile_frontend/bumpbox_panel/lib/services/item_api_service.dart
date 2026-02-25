@@ -278,4 +278,27 @@ class ItemApiService {
       return false;
     }
   }
+
+  /// Set testing to true if 5-minute test called (triggers backend logic that only charges the user after 5 minutes, allowing for testing the full flow without real payment)
+  static Future<bool?> triggerBuyWebhook({required bool testing}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/webhook'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'testing_intent': testing}),
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      }
+
+      print(
+        '[ItemApiService] Webhook returned non-200 status: ${response.statusCode}',
+      );
+      return null;
+    } catch (e) {
+      print('[ItemApiService] Error triggering buy webhook: $e');
+      return null;
+    }
+  }
 }

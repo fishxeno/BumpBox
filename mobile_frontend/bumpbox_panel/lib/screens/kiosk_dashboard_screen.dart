@@ -1576,6 +1576,17 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                         debugPrint(
                           '🛒 Buy button pressed, syncing price \$${_currentPrice.toStringAsFixed(2)}...',
                         );
+                        // Call webhook first to declare intent to webhook
+                        final webhookResult =
+                            await ItemApiService.triggerBuyWebhook(
+                              testing: false,
+                            );
+                        debugPrint('Webhook result: $webhookResult');
+
+                        if (webhookResult != true) {
+                          throw Exception('Failed to trigger buy webhook');
+                        }
+
                         final updatedItem =
                             await ItemApiService.updateItemPrice(_currentPrice);
 
@@ -1706,6 +1717,19 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                         debugPrint(
                           '\ud83e\uddea Test button pressed, syncing price \$${_currentPrice.toStringAsFixed(2)}...',
                         );
+
+                        // Call webhook first to declare intent to webhook
+                        final webhookResult =
+                            await ItemApiService.triggerBuyWebhook(
+                              testing: true,
+                            );
+                        debugPrint('Webhook result: $webhookResult');
+
+                        if (webhookResult != true) {
+                          throw Exception(
+                            'Failed to trigger test 5 min webhook',
+                          );
+                        }
                         final updatedItem =
                             await ItemApiService.updateItemPrice(_currentPrice);
 
