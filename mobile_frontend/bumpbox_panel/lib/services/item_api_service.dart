@@ -43,7 +43,10 @@ class ItemApiService {
         return null;
       }
 
-      return _parseItemFromBackend(jsonData['data']);
+      // Extract the status field to determine if item is sold
+      final isSold = jsonData['status'] == true;
+
+      return _parseItemFromBackend(jsonData['data'], isSold: isSold);
     } catch (e) {
       print('[ItemApiService] Error fetching item: $e');
       return null;
@@ -70,7 +73,11 @@ class ItemApiService {
   /// - listedAt: calculated from datetime_expire - listingDuration
   /// - listingDuration: from pricing config
   /// - paymentLink: from paymentLink
-  static Item _parseItemFromBackend(Map<String, dynamic> data) {
+  /// - isSold: whether the item has been sold (from status field)
+  static Item _parseItemFromBackend(
+    Map<String, dynamic> data, {
+    bool isSold = false,
+  }) {
     final itemId = data['itemid']?.toString() ?? 'unknown';
     final itemName = data['item_name']?.toString() ?? 'Unknown Item';
     final price = _parsePrice(data['price']);
@@ -94,6 +101,7 @@ class ItemApiService {
       listedAt: listedAt,
       listingDuration: PricingConfig.listingDuration,
       paymentLink: paymentLink,
+      isSold: isSold,
     );
   }
 
