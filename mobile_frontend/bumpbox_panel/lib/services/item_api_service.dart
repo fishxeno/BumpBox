@@ -302,4 +302,42 @@ class ItemApiService {
       return null;
     }
   }
+
+  /// Get current solenoid state from backend
+  static Future<bool?> getSolenoidState() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/api/solenoid/state'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['solenoidOn'] == true;
+      }
+      return null;
+    } catch (e) {
+      print('[ItemApiService] Error getting solenoid state: $e');
+      return null;
+    }
+  }
+
+  /// Toggle solenoid state on backend
+  static Future<bool?> toggleSolenoid() async {
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/api/solenoid/toggle'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['solenoidOn'] == true;
+      }
+      return null;
+    } catch (e) {
+      print('[ItemApiService] Error toggling solenoid state: $e');
+      return null;
+    }
+  }
 }

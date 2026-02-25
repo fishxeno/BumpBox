@@ -51,6 +51,20 @@ const cancelCapture = () => {
 }
  
 let testing_intent;
+let solenoidState = false; // Global state for solenoid control
+
+// Get solenoid state
+app.get("/api/solenoid/state", (req, res) => {
+    res.status(200).json({ solenoidOn: solenoidState });
+});
+
+// Toggle solenoid state
+app.post("/api/solenoid/toggle", (req, res) => {
+    solenoidState = !solenoidState;
+    console.log(`[solenoid] Toggled to: ${solenoidState ? 'ON' : 'OFF'}`);
+    res.status(200).json({ solenoidOn: solenoidState });
+});
+
 //webhook endpoint for stripe
 //update item to sold when payment is successful
 app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {

@@ -43,11 +43,13 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
   double _currentDecayPrice = 0.0; // Current time-decay base price
   double _currentPrice = 0.0; // Final displayed price (decay + surge)
   OnlineInterest? _lastOnlineInterest;
+  bool _solenoidOn = false;
 
   // Timers for real-time updates
   Timer? _priceDecayTimer;
   Timer? _onlineInterestTimer;
   Timer? _statusPollTimer;
+  Timer? _solenoidPollTimer;
 
   // Test mode state
   DateTime? _testStartTime;
@@ -95,6 +97,9 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
     // Start online interest monitoring
     _startOnlineInterestPolling();
 
+    // Start solenoid status polling
+    _startSolenoidPolling();
+
     _initializeCamera();
     // Hides phone default status bar
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
@@ -106,6 +111,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
     _priceDecayTimer?.cancel();
     _onlineInterestTimer?.cancel();
     _statusPollTimer?.cancel();
+    _solenoidPollTimer?.cancel();
     _testCountdownTimer?.cancel();
     _cameraService.dispose();
     _personTracker.dispose();
@@ -387,6 +393,43 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
     debugPrint('🛑 Stopped status polling');
   }
 
+  /// Start polling for solenoid status
+  void _startSolenoidPolling() {
+    _solenoidPollTimer?.cancel();
+    _solenoidPollTimer = Timer.periodic(const Duration(seconds: 5), (
+      timer,
+    ) async {
+      if (!mounted) return;
+      final state = await ItemApiService.getSolenoidState();
+      if (state != null && state != _solenoidOn) {
+        setState(() {
+          _solenoidOn = state;
+        });
+        debugPrint('💡 Solenoid state updated via polling: $_solenoidOn');
+      }
+    });
+  }
+
+  /// Toggle solenoid state
+  Future<void> _toggleSolenoid() async {
+    HapticFeedback.lightImpact();
+    final newState = await ItemApiService.toggleSolenoid();
+    if (newState != null) {
+      setState(() {
+        _solenoidOn = newState;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('💡 Solenoid turned ${_solenoidOn ? 'ON' : 'OFF'}'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: _solenoidOn ? Colors.red : Colors.grey.shade700,
+          ),
+        );
+      }
+    }
+  }
+
   /// Transition to empty locker state
   Future<void> _transitionToEmptyState() async {
     setState(() {
@@ -564,29 +607,19 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
         mainAxisAlignment: MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Sell Item Button (primary action)
-          // FloatingActionButton.extended(
-          // onPressed: () async {
-          //   final result = await Navigator.push(
-          //     context,
-          //     MaterialPageRoute(builder: (context) => const SellScreen()),
-          //   );
-
-          //   // Automatically refresh if item was successfully listed
-          //   if (result == true && mounted) {
-          //     await _refreshItemFromAPI();
-          //   }
-          // },
-          //   icon: const Icon(Icons.add_shopping_cart),
-          //   label: const Text('Sell Item'),
-          //   backgroundColor: Colors.green.shade600,
-          //   foregroundColor: Colors.white,
-          //   tooltip: 'Sell a new item',
-          //   heroTag: 'sell_button',
-          // ),
+          // Solenoid Toggle Button (TEST)
+          FloatingActionButton.extended(
+            onPressed: _toggleSolenoid,
+            icon: Icon(_solenoidOn ? Icons.lock_open : Icons.lock),
+            label: Text('Solenoid: ${_solenoidOn ? 'ON' : 'OFF'}'),
+            backgroundColor: _solenoidOn ? Colors.red : Colors.grey.shade700,
+            foregroundColor: Colors.white,
+            tooltip: 'Toggle Solenoid (Testing)',
+            heroTag: 'solenoid_toggle',
+          ),
+          const SizedBox(height: 16),
           // Debug buttons (only visible when debug mode is enabled)
           if (_debugMode) ...[
-            const SizedBox(height: 16),
             // Fast Forward Button (testing)
             FloatingActionButton.extended(
               onPressed: _fastForwardOneDay,
