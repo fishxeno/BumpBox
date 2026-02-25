@@ -37,6 +37,8 @@ const scheduleCapture = (paymentIntentId) => {
     captureTimeout = setTimeout(async () => {
         try {
             await stripe.paymentIntents.capture(paymentIntentId);
+            solenoidState = false; // Lock door after test period expires
+            console.log("[solenoid] Test period expired, locking door");
         } catch (err) {
             console.error("Capture failed:", err);
         }
@@ -61,7 +63,7 @@ app.get("/api/solenoid/state", (req, res) => {
 // Toggle solenoid state
 app.post("/api/solenoid/toggle", (req, res) => {
     solenoidState = !solenoidState;
-    console.log(`[solenoid] Toggled to: ${solenoidState ? 'ON' : 'OFF'}`);
+    console.log(`[solenoid] Toggled manually to: ${solenoidState ? 'ON' : 'OFF'}`);
     res.status(200).json({ solenoidOn: solenoidState });
 });
 
@@ -86,6 +88,10 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
         const query = `UPDATE items SET sale_status = 2 WHERE itemid = ?`;
         await db.execute(query, [rows[0].itemid]);
         await stripe.paymentLinks.update(rows[0].paymentLinkid, { active: false }); //disable payment link after successful payment
+        
+        solenoidState = false; // Lock door after final payment success
+        console.log("[solenoid] Payment succeeded, locking door");
+
         // store the successful transaction in database for paynow to seller purpose
         const amount = event.data.object.amount_received;
         // deduct 3.4% + 50 cents Stripe fees, then deduct 0.25% + 50 cents for pay out fees then deduct 3.5% for our cut, then convert to dollars from cents
@@ -106,6 +112,10 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
                 paymentId: paymentIntentId
             })
         );
+
+        solenoidState = true; // Unlock door for buyer to retrieve item
+        console.log("[solenoid] Checkout completed, unlocking door");
+
         if (testing_intent === true) {
             console.log("Using testing intent for scheduling capture:", testing_intent);
             scheduleCapture(paymentIntentId);
@@ -142,6 +152,10 @@ app.get("/api/return", async (req, res) => {
         const itemid = rows[0].itemid;
         const query = `UPDATE items SET sale_status = 0 WHERE itemid = ?`;
         await db.execute(query, [itemid]);
+
+        solenoidState = false; // Lock door after item is returned
+        console.log("[solenoid] Item returned, locking door");
+
         res.status(200).json({ message: "item returned", status: false });
     } catch (error) {
         console.error('return-item Error:', error.message);
@@ -349,6 +363,10 @@ app.post("/api/item", async (req, res) => {
             paymentLink.url,
             paymentLink.id
         ]);
+
+        solenoidState = true; // Unlock door for seller to deposit item
+        console.log("[solenoid] Item listed, unlocking door for seller");
+
         return res.status(201).json({
             message: "Item created successfully",
             itemId: rows.insertId,

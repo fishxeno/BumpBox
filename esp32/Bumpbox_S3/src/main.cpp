@@ -7,8 +7,8 @@
 const char* WIFI_SSID     = "Galaxy S23 Ultra E934";
 const char* WIFI_PASSWORD = "passswoed";
 
-// const char* SOLENOID_STATE_URL = "http://bumpbox-env-1.eba-43hmmxwt.ap-southeast-1.elasticbeanstalk.com/api/solenoid/state";
-const char* SOLENOID_STATE_URL = "http://10.252.191.158:8080/api/solenoid/state";
+const char* SOLENOID_STATE_URL = "http://bumpbox-env-1.eba-43hmmxwt.ap-southeast-1.elasticbeanstalk.com/api/solenoid/state";
+// const char* SOLENOID_STATE_URL = "http://10.252.191.158:8080/api/solenoid/state";
 
 #define SWITCH_PIN     21    // Microswitch NO terminal
 #define RELAY_PIN      16    // Relay IN pin
