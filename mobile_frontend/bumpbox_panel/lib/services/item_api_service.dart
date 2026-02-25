@@ -235,4 +235,30 @@ class ItemApiService {
       return null;
     }
   }
+
+  /// Call the return endpoint to cancel a test purchase
+  /// Returns true if return was successful, false otherwise
+  static Future<bool> returnItem() async {
+    try {
+      print('[ItemApiService] Calling return endpoint');
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/api/return'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        print('[ItemApiService] Item returned successfully');
+        return true;
+      } else {
+        print(
+          '[ItemApiService] Return failed: ${response.statusCode} ${response.body}',
+        );
+        return false;
+      }
+    } catch (e) {
+      print('[ItemApiService] Error returning item: $e');
+      return false;
+    }
+  }
 }

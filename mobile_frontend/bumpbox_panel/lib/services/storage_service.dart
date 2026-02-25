@@ -17,6 +17,7 @@ class StorageService {
   static const String _keyPhysicalSurgeCount = 'physical_surge_count';
   static const String _keyOnlineSurgeCount = 'online_surge_count';
   static const String _keyLastPriceUpdate = 'last_price_update';
+  static const String _testStartTimeKey = 'test_start_time';
 
   /// Save current item to local storage
   static Future<void> saveItem(Item item) async {
@@ -162,5 +163,52 @@ class StorageService {
   static Future<bool> hasSavedState() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.containsKey(_keyItemId);
+  }
+
+  /// Save test session start time
+  static Future<void> saveTestStartTime(DateTime startTime) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_testStartTimeKey, startTime.toIso8601String());
+      print('[StorageService] Test start time saved: $startTime');
+    } catch (e) {
+      print('[StorageService] Error saving test start time: $e');
+    }
+  }
+
+  /// Load test session start time
+  static Future<DateTime?> loadTestStartTime() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timeStr = prefs.getString(_testStartTimeKey);
+      if (timeStr == null) return null;
+
+      final startTime = DateTime.parse(timeStr);
+      print('[StorageService] Test start time loaded: $startTime');
+
+      // Check if expired (more than 5 minutes ago)
+      final elapsed = DateTime.now().difference(startTime);
+      if (elapsed > const Duration(minutes: 5)) {
+        print('[StorageService] Test period expired, clearing');
+        await clearTestStartTime();
+        return null;
+      }
+
+      return startTime;
+    } catch (e) {
+      print('[StorageService] Error loading test start time: $e');
+      return null;
+    }
+  }
+
+  /// Clear test session start time
+  static Future<void> clearTestStartTime() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_testStartTimeKey);
+      print('[StorageService] Test start time cleared');
+    } catch (e) {
+      print('[StorageService] Error clearing test start time: $e');
+    }
   }
 }

@@ -12,12 +12,16 @@ Future<bool> showPaymentDialog(
   BuildContext context, {
   required Item item,
   required double currentPrice,
+  bool isTestMode = false,
 }) async {
   final result = await showDialog<bool>(
     context: context,
     barrierDismissible: false, // Prevent accidental dismissal
-    builder: (context) =>
-        _PaymentDialog(item: item, currentPrice: currentPrice),
+    builder: (context) => _PaymentDialog(
+      item: item,
+      currentPrice: currentPrice,
+      isTestMode: isTestMode,
+    ),
   );
 
   return result ?? false;
@@ -26,8 +30,13 @@ Future<bool> showPaymentDialog(
 class _PaymentDialog extends StatefulWidget {
   final Item item;
   final double currentPrice;
+  final bool isTestMode;
 
-  const _PaymentDialog({required this.item, required this.currentPrice});
+  const _PaymentDialog({
+    required this.item,
+    required this.currentPrice,
+    this.isTestMode = false,
+  });
 
   @override
   State<_PaymentDialog> createState() => _PaymentDialogState();
@@ -137,7 +146,11 @@ class _PaymentDialogState extends State<_PaymentDialog> {
                 Expanded(child: const Text('Payment Successful!')),
               ],
             )
-          : Text('Buy ${widget.item.name}'),
+          : Text(
+              widget.isTestMode
+                  ? 'Test Purchase - Refundable Deposit'
+                  : 'Buy ${widget.item.name}',
+            ),
       content: SizedBox(
         width: MediaQuery.of(context).size.width * 0.8,
         child: SingleChildScrollView(
@@ -159,6 +172,42 @@ class _PaymentDialogState extends State<_PaymentDialog> {
                   textAlign: TextAlign.center,
                 ),
               ] else ...[
+                // Test mode info banner
+                if (widget.isTestMode) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.orange.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.orange.shade800,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'You have 5 minutes to return this item for a full refund',
+                            style: TextStyle(
+                              color: Colors.orange.shade900,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
                 // Price display
                 Container(
                   padding: const EdgeInsets.all(16),
