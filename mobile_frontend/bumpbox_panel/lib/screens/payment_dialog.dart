@@ -134,7 +134,7 @@ class _PaymentDialogState extends State<_PaymentDialog> {
                   size: 28,
                 ),
                 const SizedBox(width: 12),
-                const Text('Payment Successful!'),
+                Expanded(child: const Text('Payment Successful!')),
               ],
             )
           : Text('Buy ${widget.item.name}'),

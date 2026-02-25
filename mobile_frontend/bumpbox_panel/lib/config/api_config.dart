@@ -1,9 +1,9 @@
 /// API configuration for BumpBox backend integration
 class ApiConfig {
   /// Base URL for the backend server
-  // static const String baseUrl =
-  // 'http://bumpbox-env-1.eba-43hmmxwt.ap-southeast-1.elasticbeanstalk.com'; // prod
-  static const String baseUrl = 'http://10.192.1.2:8080';
+  static const String baseUrl =
+      'http://bumpbox-env-1.eba-43hmmxwt.ap-southeast-1.elasticbeanstalk.com'; // prod
+  // static const String baseUrl = 'http://10.192.1.2:8080';
   // static const String baseUrl = 'http://10.252.191.158:8080';
 
   /// Endpoint to trigger ESP32 camera capture

@@ -35,7 +35,7 @@ class DetectionResult {
       confidence: detection['confidence'] as int? ?? 0,
       timestamp: json['timestamp'] != null
           ? DateTime.parse(json['timestamp'] as String)
-          : DateTime.now(),
+          : DateTime.now().toUtc(),
       lockerId: json['lockerId'] as String?,
       imageUrl: json['hasImage'] == true
           ? null

@@ -60,13 +60,24 @@ class _SellScreenState extends State<SellScreen> {
     });
 
     try {
+      // Capture timestamp BEFORE triggering to avoid race condition
+      // Add buffer for clock skew between devices
+      // Convert to UTC to match server's UTC timestamps
+      final startTime = DateTime.now().toUtc().subtract(
+        const Duration(seconds: 5),
+      );
+      print(
+        '[SellScreen] Starting detection with timestamp: ${startTime.toIso8601String()}',
+      );
+
       // Trigger ESP32 capture
       await DetectionService.triggerCapture();
+      print('[SellScreen] ESP32 triggered successfully');
 
       // Start polling for result
       setState(() {
         _currentState = _ScreenState.detecting;
-        _pollingStartTime = DateTime.now();
+        _pollingStartTime = startTime;
         _elapsedSeconds = 0;
       });
 
@@ -75,26 +86,29 @@ class _SellScreenState extends State<SellScreen> {
         if (mounted) {
           setState(() {
             _elapsedSeconds = DateTime.now()
-                .difference(_pollingStartTime!)
+                .toUtc()
+                .difference(startTime)
                 .inSeconds;
           });
         }
       });
 
       // Poll for detection result
-      final result = await DetectionService.pollForDetection(
-        since: _pollingStartTime,
-      );
+      final result = await DetectionService.pollForDetection(since: startTime);
 
       _pollingTimer?.cancel();
 
       if (result != null) {
+        print(
+          '[SellScreen] Detection received: ${result.label} at ${result.timestamp}',
+        );
         setState(() {
           _detectionResult = result;
           _currentState = _ScreenState.showingResults;
           _populateFormWithDetection(result);
         });
       } else {
+        print('[SellScreen] Detection timed out - no result found');
         setState(() {
           _currentState = _ScreenState.ready;
           _errorMessage =
