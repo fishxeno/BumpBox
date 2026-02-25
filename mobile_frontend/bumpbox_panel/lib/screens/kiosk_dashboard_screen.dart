@@ -49,6 +49,11 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
   Timer? _onlineInterestTimer;
   Timer? _statusPollTimer;
 
+  // Test mode state
+  DateTime? _testStartTime;
+  Timer? _testCountdownTimer;
+  Duration? _testTimeRemaining;
+
   // Testing: Time offset for fast-forwarding
   int _daysFastForwarded = 0;
   bool _debugMode = false; // Toggle to show/hide debug buttons
@@ -101,6 +106,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
     _priceDecayTimer?.cancel();
     _onlineInterestTimer?.cancel();
     _statusPollTimer?.cancel();
+    _testCountdownTimer?.cancel();
     _cameraService.dispose();
     _personTracker.dispose();
     super.dispose();
@@ -217,14 +223,17 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
     final savedItem = await StorageService.loadItem();
     final savedCounts = await StorageService.loadSurgeCounts();
 
-    if (savedItem != null) {
-      // Check if saved item is sold
-      if (savedItem.isSold == true) {
-        debugPrint('💾 Saved item was sold, transitioning to empty state');
-        await _transitionToEmptyState();
-        return;
-      }
+    // Load test session if exists
+    final testStartTime = await StorageService.loadTestStartTime();
+    if (testStartTime != null) {
+      setState(() {
+        _testStartTime = testStartTime;
+      });
+      _startTestCountdown();
+      debugPrint('🧪 Resumed test session from $testStartTime');
+    }
 
+    if (savedItem != null) {
       _currentItem = savedItem;
       _lockerState = LockerState.available;
       _surgeCount = savedCounts['surgeCount'] ?? 0;
@@ -234,23 +243,22 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
     } else {
       // No saved state, try to fetch from backend API
       debugPrint('📡 Fetching item from backend API...');
-      final apiItem = await ItemApiService.fetchLatestItem();
+      final result = await ItemApiService.fetchLatestItem();
 
-      if (apiItem != null) {
-        // Check if the fetched item is sold
-        if (apiItem.isSold == true) {
-          debugPrint('📡 API returned sold item, transitioning to empty state');
-          await _transitionToEmptyState();
-          return;
-        }
-
-        _currentItem = apiItem;
+      if (result.isEmpty) {
+        // Backend confirmed locker is empty
+        debugPrint('📡 Backend confirmed empty locker');
+        await _transitionToEmptyState();
+        return;
+      } else if (result.isAvailable) {
+        // Item available
+        _currentItem = result.item!;
         _lockerState = LockerState.available;
         await StorageService.saveItem(_currentItem!);
         debugPrint('✅ Loaded item from API: ${_currentItem!.name}');
       } else {
-        // API failed or no item, fall back to mock data
-        debugPrint('⚠️ API fetch failed, using mock data');
+        // API error, fall back to mock data
+        debugPrint('⚠️ API fetch error: ${result.message}, using mock data');
         _currentItem = MockDataService.getMockItem();
         _lockerState = LockerState.available;
         await StorageService.saveItem(_currentItem!);
@@ -273,28 +281,26 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
   Future<void> _refreshItemFromAPI() async {
     debugPrint('🔄 Manually refreshing item from API...');
 
-    final apiItem = await ItemApiService.fetchLatestItem();
+    final result = await ItemApiService.fetchLatestItem();
 
-    if (apiItem != null) {
-      // Check if the item is sold
-      if (apiItem.isSold == true) {
-        debugPrint('🔄 Refreshed item is sold, transitioning to empty state');
-        await _transitionToEmptyState();
+    if (result.isEmpty) {
+      // Backend confirmed locker is empty
+      debugPrint('🔄 Backend confirmed empty locker');
+      await _transitionToEmptyState();
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Item sold! Locker is now empty'),
-              duration: Duration(seconds: 3),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-        return;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Item sold! Locker is now empty'),
+            duration: Duration(seconds: 3),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
-
+      return;
+    } else if (result.isAvailable) {
       setState(() {
-        _currentItem = apiItem;
+        _currentItem = result.item!;
         _lockerState = LockerState.available;
         // Reset surge counts for new item
         _surgeCount = 0;
@@ -321,7 +327,8 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
         );
       }
     } else {
-      debugPrint('❌ Failed to refresh item from API');
+      // Error
+      debugPrint('❌ Failed to refresh item from API: ${result.message}');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -350,11 +357,11 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
         if (mounted &&
             _lockerState == LockerState.available &&
             _currentItem != null) {
-          final apiItem = await ItemApiService.fetchLatestItem();
+          final result = await ItemApiService.fetchLatestItem();
 
-          if (apiItem != null && apiItem.isSold == true) {
+          if (result.isEmpty) {
             debugPrint(
-              '🔔 Polling detected item sold! Transitioning to empty state',
+              '🔔 Polling detected empty locker! Transitioning to empty state',
             );
             await _transitionToEmptyState();
 
@@ -1367,6 +1374,168 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
               ),
             ],
 
+            // Return Button (shown only during active test session)
+            if (_testTimeRemaining != null && _testStartTime != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 24, bottom: 8),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    border: Border.all(color: Colors.orange.shade300, width: 2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.timer,
+                            color: Colors.orange.shade700,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Test Period: ${_formatDuration(_testTimeRemaining!)} remaining',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange.shade900,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          HapticFeedback.mediumImpact();
+
+                          // Show confirmation dialog
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Return Item?'),
+                              content: const Text(
+                                'Are you sure you want to return this item? You will receive a full refund.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                  child: const Text('Return Item'),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirmed != true || !mounted) return;
+
+                          // Show loading
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => const Center(
+                              child: Card(
+                                child: Padding(
+                                  padding: EdgeInsets.all(32.0),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      CircularProgressIndicator(),
+                                      SizedBox(height: 16),
+                                      Text('Processing return...'),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+
+                          try {
+                            // Call return API
+                            final success = await ItemApiService.returnItem();
+
+                            // Close loading dialog
+                            if (mounted) {
+                              Navigator.of(context).pop();
+                            }
+
+                            if (success) {
+                              // Stop countdown timer
+                              _stopTestCountdown();
+
+                              // Show success message
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      '\u2705 Item returned successfully! Full refund processed.',
+                                    ),
+                                    backgroundColor: Colors.green,
+                                    duration: Duration(seconds: 3),
+                                  ),
+                                );
+                              }
+
+                              // Refresh item state
+                              await _refreshItemFromAPI();
+                            } else {
+                              // Show error
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      '\u274c Failed to return item. Please try again.',
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            if (mounted && Navigator.of(context).canPop()) {
+                              Navigator.of(context).pop();
+                            }
+
+                            debugPrint('\u274c Error during return: $e');
+
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('\u274c Error: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.keyboard_return),
+                        label: const Text('Return Item for Full Refund'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
             // Action Buttons
             const SizedBox(height: 24),
             Row(
@@ -1407,9 +1576,19 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                         debugPrint(
                           '🛒 Buy button pressed, syncing price \$${_currentPrice.toStringAsFixed(2)}...',
                         );
-                        final updatedItem = await ItemApiService.updateItemPrice(
-                          _currentPrice,
-                        );
+                        // Call webhook first to declare intent to webhook
+                        final webhookResult =
+                            await ItemApiService.triggerBuyWebhook(
+                              testing: false,
+                            );
+                        debugPrint('Webhook result: $webhookResult');
+
+                        if (webhookResult != true) {
+                          throw Exception('Failed to trigger buy webhook');
+                        }
+
+                        final updatedItem =
+                            await ItemApiService.updateItemPrice(_currentPrice);
 
                         // Close loading indicator
                         if (mounted) {
@@ -1420,9 +1599,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text(
-                                  '❌ Failed to prepare payment',
-                                ),
+                                content: Text('❌ Failed to prepare payment'),
                                 duration: Duration(seconds: 3),
                                 backgroundColor: Colors.red,
                               ),
@@ -1437,9 +1614,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text(
-                                  '❌ Payment link not available',
-                                ),
+                                content: Text('❌ Payment link not available'),
                                 duration: Duration(seconds: 3),
                                 backgroundColor: Colors.red,
                               ),
@@ -1509,7 +1684,132 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                 // Test Button (Secondary Action)
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {}, // Placeholder - no functionality yet
+                    onPressed: () async {
+                      HapticFeedback.mediumImpact();
+
+                      // Show loading indicator
+                      if (!mounted) return;
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => const Center(
+                          child: Card(
+                            child: Padding(
+                              padding: EdgeInsets.all(32.0),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircularProgressIndicator(),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'Preparing test session...',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+
+                      try {
+                        // Update price to backend (same as Buy button)
+                        debugPrint(
+                          '\ud83e\uddea Test button pressed, syncing price \$${_currentPrice.toStringAsFixed(2)}...',
+                        );
+
+                        // Call webhook first to declare intent to webhook
+                        final webhookResult =
+                            await ItemApiService.triggerBuyWebhook(
+                              testing: true,
+                            );
+                        debugPrint('Webhook result: $webhookResult');
+
+                        if (webhookResult != true) {
+                          throw Exception(
+                            'Failed to trigger test 5 min webhook',
+                          );
+                        }
+                        final updatedItem =
+                            await ItemApiService.updateItemPrice(_currentPrice);
+
+                        // Close loading indicator
+                        if (mounted) {
+                          Navigator.of(context).pop();
+                        }
+
+                        if (updatedItem == null ||
+                            updatedItem.paymentLink == null) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  '\u274c Failed to prepare test session',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        // Update local state
+                        setState(() {
+                          _currentItem = updatedItem;
+                        });
+                        await StorageService.saveItem(_currentItem!);
+
+                        debugPrint(
+                          '\u2705 Test session prepared, showing payment dialog',
+                        );
+
+                        // Show payment dialog in TEST MODE
+                        if (!mounted) return;
+                        final paymentSuccessful = await showPaymentDialog(
+                          context,
+                          item: updatedItem,
+                          currentPrice: _currentPrice,
+                          isTestMode: true, // THIS IS THE KEY DIFFERENCE
+                        );
+
+                        // If payment successful, start test session
+                        if (paymentSuccessful && mounted) {
+                          debugPrint(
+                            '\u2705 Test payment successful, starting 5-minute timer',
+                          );
+
+                          // Store test session start time
+                          setState(() {
+                            _testStartTime = DateTime.now();
+                          });
+                          await StorageService.saveTestStartTime(
+                            _testStartTime!,
+                          );
+
+                          // Start countdown timer
+                          _startTestCountdown();
+
+                          // Refresh item state
+                          await _refreshItemFromAPI();
+                        }
+                      } catch (e) {
+                        // Close loading indicator if still open
+                        if (mounted && Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        }
+
+                        debugPrint('\u274c Error preparing test session: $e');
+
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('\u274c Error: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
                     icon: const Icon(Icons.timer, size: 20),
                     label: const Text(
                       'Test 5 min',
@@ -1564,5 +1864,63 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
         ),
       ),
     );
+  }
+
+  /// Start the 5-minute test countdown timer
+  void _startTestCountdown() {
+    // Cancel existing timer if any
+    _testCountdownTimer?.cancel();
+
+    debugPrint('🕐 Starting 5-minute test countdown');
+
+    _testCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_testStartTime == null) {
+        timer.cancel();
+        return;
+      }
+
+      final elapsed = DateTime.now().difference(_testStartTime!);
+      final remaining = const Duration(minutes: 5) - elapsed;
+
+      if (remaining.isNegative || remaining.inSeconds <= 0) {
+        // Time expired
+        debugPrint('⏰ Test period expired');
+        setState(() {
+          _testTimeRemaining = null;
+          _testStartTime = null;
+        });
+        timer.cancel();
+
+        // Refresh item state (should show as sold now)
+        _refreshItemFromAPI();
+
+        // Clear saved test time
+        StorageService.clearTestStartTime();
+      } else {
+        // Update remaining time
+        setState(() {
+          _testTimeRemaining = remaining;
+        });
+      }
+    });
+  }
+
+  /// Stop and clear the test countdown timer
+  void _stopTestCountdown() {
+    _testCountdownTimer?.cancel();
+    _testCountdownTimer = null;
+    setState(() {
+      _testTimeRemaining = null;
+      _testStartTime = null;
+    });
+    StorageService.clearTestStartTime();
+  }
+
+  /// Format duration as MM:SS
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$minutes:$seconds';
   }
 }
