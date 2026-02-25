@@ -18,12 +18,17 @@
 
 // ====================== CONFIGURATION ======================
 // -- WiFi (change these!) --
-const char* WIFI_SSID     = "YOUR_WIFI_SSID";       // <-- Change this
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";    // <-- Change this
+const char* WIFI_SSID     = "Galaxy S23 Ultra E934";       // <-- Change this
+const char* WIFI_PASSWORD = "passswoed";    // <-- Change this
 
 // -- Server --
+// server URL (change IP if your computer's local IP changes)
+// const char* SERVER_URL = "http://10.252.191.158:8080/detect-object";
+// const char* POLL_TRIGGER_URL = "http://10.252.191.158:8080/api/locker/capture-trigger";
 const char* SERVER_URL = "http://bumpbox-env-1.eba-43hmmxwt.ap-southeast-1.elasticbeanstalk.com/detect-object";
-const bool  USE_MOCK   = false;  // true = test mode, false = real Google Vision API
+const char* POLL_TRIGGER_URL = "http://bumpbox-env-1.eba-43hmmxwt.ap-southeast-1.elasticbeanstalk.com/api/locker/capture-trigger";
+const char* LOCKER_ID  = "locker1";  // Locker identifier
+const bool  USE_MOCK   = false;  // true = test without Google Vision API
 
 // -- Pins --
 #define BUTTON_PIN     13   // Trigger button (connect to GND)
@@ -261,6 +266,7 @@ bool sendToServer(uint8_t* imageData, size_t imageLen) {
     String resp = http.getString();
     http.end();
     parseResponse(resp);
+    Serial.println("[HTTP] Success!");
     return true;
   }
 

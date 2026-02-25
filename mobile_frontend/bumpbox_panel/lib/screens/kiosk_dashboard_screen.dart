@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../config/api_config.dart';
 import '../config/pricing_config.dart';
 import '../models/attention_state.dart';
 import '../models/item.dart';
@@ -28,8 +29,9 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
   final CameraService _cameraService = CameraService();
   late final PersonTracker _personTracker;
 
-  // Item data (from mock service, simulating backend)
-  late Item _currentItem;
+  // Item data (nullable - may be empty when locker has no item)
+  Item? _currentItem;
+  LockerState _lockerState = LockerState.empty;
 
   // State variables
   PresenceState? _currentState;
@@ -45,6 +47,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
   // Timers for real-time updates
   Timer? _priceDecayTimer;
   Timer? _onlineInterestTimer;
+  Timer? _statusPollTimer;
 
   // Testing: Time offset for fast-forwarding
   int _daysFastForwarded = 0;
@@ -97,6 +100,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
     WidgetsBinding.instance.removeObserver(this);
     _priceDecayTimer?.cancel();
     _onlineInterestTimer?.cancel();
+    _statusPollTimer?.cancel();
     _cameraService.dispose();
     _personTracker.dispose();
     super.dispose();
@@ -176,13 +180,15 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
 
   /// Update both decay price and final price
   void _updatePrices() {
+    if (_currentItem == null) return;
+
     final now = _getEffectiveNow();
     _currentDecayPrice = PricingService.calculateTimeDecayPrice(
-      _currentItem,
+      _currentItem!,
       now,
     );
     _currentPrice = PricingService.getFinalPrice(
-      _currentItem,
+      _currentItem!,
       _surgeCount,
       now,
     );
@@ -212,30 +218,52 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
     final savedCounts = await StorageService.loadSurgeCounts();
 
     if (savedItem != null) {
+      // Check if saved item is sold
+      if (savedItem.isSold == true) {
+        debugPrint('💾 Saved item was sold, transitioning to empty state');
+        await _transitionToEmptyState();
+        return;
+      }
+
       _currentItem = savedItem;
+      _lockerState = LockerState.available;
       _surgeCount = savedCounts['surgeCount'] ?? 0;
       _physicalSurgeCount = savedCounts['physicalSurgeCount'] ?? 0;
       _onlineSurgeCount = savedCounts['onlineSurgeCount'] ?? 0;
-      debugPrint('💾 Loaded saved item: ${_currentItem.name}');
+      debugPrint('💾 Loaded saved item: ${_currentItem!.name}');
     } else {
       // No saved state, try to fetch from backend API
       debugPrint('📡 Fetching item from backend API...');
       final apiItem = await ItemApiService.fetchLatestItem();
 
       if (apiItem != null) {
+        // Check if the fetched item is sold
+        if (apiItem.isSold == true) {
+          debugPrint('📡 API returned sold item, transitioning to empty state');
+          await _transitionToEmptyState();
+          return;
+        }
+
         _currentItem = apiItem;
-        await StorageService.saveItem(_currentItem);
-        debugPrint('✅ Loaded item from API: ${_currentItem.name}');
+        _lockerState = LockerState.available;
+        await StorageService.saveItem(_currentItem!);
+        debugPrint('✅ Loaded item from API: ${_currentItem!.name}');
       } else {
         // API failed or no item, fall back to mock data
         debugPrint('⚠️ API fetch failed, using mock data');
         _currentItem = MockDataService.getMockItem();
-        await StorageService.saveItem(_currentItem);
-        debugPrint('🆕 Created new mock item: ${_currentItem.name}');
+        _lockerState = LockerState.available;
+        await StorageService.saveItem(_currentItem!);
+        debugPrint('🆕 Created new mock item: ${_currentItem!.name}');
       }
     }
 
     _updatePrices();
+
+    // Start polling for sold status if we have an item
+    if (_lockerState == LockerState.available) {
+      _startStatusPolling();
+    }
   }
 
   /// Manually refresh item from backend API
@@ -248,24 +276,45 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
     final apiItem = await ItemApiService.fetchLatestItem();
 
     if (apiItem != null) {
+      // Check if the item is sold
+      if (apiItem.isSold == true) {
+        debugPrint('🔄 Refreshed item is sold, transitioning to empty state');
+        await _transitionToEmptyState();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Item sold! Locker is now empty'),
+              duration: Duration(seconds: 3),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        return;
+      }
+
       setState(() {
         _currentItem = apiItem;
+        _lockerState = LockerState.available;
         // Reset surge counts for new item
         _surgeCount = 0;
         _physicalSurgeCount = 0;
         _onlineSurgeCount = 0;
       });
 
-      await StorageService.saveItem(_currentItem);
+      await StorageService.saveItem(_currentItem!);
       await _saveSurgeCounts();
       _updatePrices();
 
-      debugPrint('✅ Refreshed item from API: ${_currentItem.name}');
+      // Restart polling for new item
+      _startStatusPolling();
+
+      debugPrint('✅ Refreshed item from API: ${_currentItem!.name}');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Loaded: ${_currentItem.name}'),
+            content: Text('✅ Loaded: ${_currentItem!.name}'),
             duration: const Duration(seconds: 3),
             backgroundColor: Colors.green.shade700,
           ),
@@ -284,6 +333,72 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
         );
       }
     }
+  }
+
+  /// Start polling for item sold status
+  void _startStatusPolling() {
+    // Stop any existing timer
+    _stopStatusPolling();
+
+    debugPrint(
+      '🔄 Starting status polling every ${ApiConfig.statusPollIntervalSeconds}s',
+    );
+
+    _statusPollTimer = Timer.periodic(
+      Duration(seconds: ApiConfig.statusPollIntervalSeconds),
+      (timer) async {
+        if (mounted &&
+            _lockerState == LockerState.available &&
+            _currentItem != null) {
+          final apiItem = await ItemApiService.fetchLatestItem();
+
+          if (apiItem != null && apiItem.isSold == true) {
+            debugPrint(
+              '🔔 Polling detected item sold! Transitioning to empty state',
+            );
+            await _transitionToEmptyState();
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('✅ Item sold! Locker is now empty'),
+                  duration: Duration(seconds: 4),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          }
+        }
+      },
+    );
+  }
+
+  /// Stop polling for item sold status
+  void _stopStatusPolling() {
+    _statusPollTimer?.cancel();
+    _statusPollTimer = null;
+    debugPrint('🛑 Stopped status polling');
+  }
+
+  /// Transition to empty locker state
+  Future<void> _transitionToEmptyState() async {
+    setState(() {
+      _currentItem = null;
+      _lockerState = LockerState.empty;
+      _surgeCount = 0;
+      _physicalSurgeCount = 0;
+      _onlineSurgeCount = 0;
+      _currentDecayPrice = 0.0;
+      _currentPrice = 0.0;
+    });
+
+    // Clear stored item data
+    await StorageService.clearCurrentItem();
+
+    // Stop polling when empty
+    _stopStatusPolling();
+
+    debugPrint('🏁 Transitioned to empty locker state');
   }
 
   /// Save surge counts to storage
@@ -351,9 +466,11 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
   }
 
   Color _getPriceColor() {
+    if (_currentItem == null) return Colors.grey.shade700;
+
     if (_surgeCount == 0) {
       // No surge, show decay-based color
-      final progress = _currentItem.getListingProgress(_getEffectiveNow());
+      final progress = _currentItem!.getListingProgress(_getEffectiveNow());
       if (progress < 0.3) {
         return Colors.blue.shade700; // Early days, still expensive
       } else if (progress < 0.7) {
@@ -555,12 +672,145 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
         builder: (context, constraints) {
           final isLandscape = constraints.maxWidth > constraints.maxHeight;
 
+          // Show empty state if no item
+          if (_lockerState == LockerState.empty || _currentItem == null) {
+            return _buildEmptyState(isLandscape);
+          }
+
           if (isLandscape) {
             return _buildLandscapeLayout();
           } else {
             return _buildPortraitLayout();
           }
         },
+      ),
+    );
+  }
+
+  /// Build empty locker state UI
+  Widget _buildEmptyState(bool isLandscape) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.blue.shade50, Colors.white],
+        ),
+      ),
+      child: Center(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(isLandscape ? 48.0 : 32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Empty box icon
+              Container(
+                width: isLandscape ? 180 : 150,
+                height: isLandscape ? 180 : 150,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.grey.shade300, width: 3),
+                ),
+                child: Icon(
+                  Icons.inventory_2_outlined,
+                  size: isLandscape ? 100 : 80,
+                  color: Colors.grey.shade400,
+                ),
+              ),
+              SizedBox(height: isLandscape ? 40 : 32),
+
+              // Main message
+              Text(
+                'Locker is Empty',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: isLandscape ? 42 : 36,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              SizedBox(height: isLandscape ? 20 : 16),
+
+              // Subtitle / call to action
+              Text(
+                'No items currently listed for sale',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: isLandscape ? 20 : 18,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              SizedBox(height: isLandscape ? 16 : 12),
+              Text(
+                'Want to sell something? List your item now!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: isLandscape ? 18 : 16,
+                  color: Colors.grey.shade600,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              SizedBox(height: isLandscape ? 48 : 40),
+
+              // Prominent "List an Item" button
+              ElevatedButton.icon(
+                onPressed: () async {
+                  HapticFeedback.mediumImpact();
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const SellScreen()),
+                  );
+
+                  // If item was successfully created, refresh
+                  if (result == true) {
+                    await _refreshItemFromAPI();
+                  }
+                },
+                icon: const Icon(Icons.add_shopping_cart, size: 32),
+                label: Text(
+                  'List an Item for Sale',
+                  style: TextStyle(
+                    fontSize: isLandscape ? 24 : 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade600,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isLandscape ? 48 : 40,
+                    vertical: isLandscape ? 24 : 20,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 4,
+                ),
+              ),
+              SizedBox(height: isLandscape ? 24 : 20),
+
+              // Secondary refresh button
+              TextButton.icon(
+                onPressed: () async {
+                  HapticFeedback.lightImpact();
+                  await _refreshItemFromAPI();
+                },
+                icon: Icon(Icons.refresh, color: Colors.grey.shade600),
+                label: Text(
+                  'Refresh',
+                  style: TextStyle(
+                    fontSize: isLandscape ? 18 : 16,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -613,7 +863,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                             Expanded(
                               child: FittedBox(
                                 child: Text(
-                                  _currentItem.name,
+                                  _currentItem!.name,
                                   style: TextStyle(
                                     fontSize: 6,
                                     fontWeight: FontWeight.bold,
@@ -626,7 +876,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              _currentItem.description,
+                              _currentItem!.description,
                               style: TextStyle(
                                 fontSize: 28,
                                 color: Colors.grey.shade700,
@@ -658,7 +908,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    _currentItem.formatTimeRemaining(
+                                    _currentItem!.formatTimeRemaining(
                                       _getEffectiveNow(),
                                     ),
                                     style: TextStyle(
@@ -850,7 +1100,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                                     ),
                                     Text(
                                       PricingConfig.formatPrice(
-                                        _currentItem.floorPrice,
+                                        _currentItem!.floorPrice,
                                       ),
                                       style: TextStyle(
                                         fontSize: 14,
@@ -933,7 +1183,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                 );
               },
               child: Text(
-                _currentItem.name,
+                _currentItem!.name,
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -951,7 +1201,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
 
             // Item Description
             Text(
-              _currentItem.description,
+              _currentItem!.description,
               textAlign: TextAlign.center,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
@@ -978,7 +1228,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                   Icon(Icons.schedule, color: Colors.blue.shade700, size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    _currentItem.formatTimeRemaining(_getEffectiveNow()),
+                    _currentItem!.formatTimeRemaining(_getEffectiveNow()),
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.blue.shade900,
@@ -1066,7 +1316,7 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                           ],
                           const SizedBox(height: 8),
                           Text(
-                            'Floor: ${PricingConfig.formatPrice(_currentItem.floorPrice)}',
+                            'Floor: ${PricingConfig.formatPrice(_currentItem!.floorPrice)}',
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.grey.shade500,
@@ -1211,36 +1461,38 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                // Sell Item Button (Tertiary Action)
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SellScreen(),
-                        ),
-                      );
+                // Sell Item Button (Tertiary Action - Debug Mode Only)
+                if (_debugMode) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SellScreen(),
+                          ),
+                        );
 
-                      // Automatically refresh if item was successfully listed
-                      if (result == true && mounted) {
-                        await _refreshItemFromAPI();
-                      }
-                    }, // Placeholder - no functionality yet
-                    icon: const Icon(Icons.sell, size: 20),
-                    label: const Text('Sell'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade600,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        // Automatically refresh if item was successfully listed
+                        if (result == true && mounted) {
+                          await _refreshItemFromAPI();
+                        }
+                      },
+                      icon: const Icon(Icons.sell, size: 20),
+                      label: const Text('Sell'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
                       ),
-                      elevation: 2,
                     ),
                   ),
-                ),
+                ],
               ],
             ),
             const SizedBox(height: 16),
