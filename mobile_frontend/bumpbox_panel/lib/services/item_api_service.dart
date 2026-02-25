@@ -60,7 +60,8 @@ class ItemApiService {
 
       // Extract the status field to determine if item is sold
       // Note: "Item is sold with status empty locker" means test mode, not truly sold
-      final isSold = status == true && message == 'Item is sold with status sold';
+      final isSold =
+          status == true && message == 'Item is sold with status sold';
 
       final item = _parseItemFromBackend(jsonData['data'], isSold: isSold);
       return ItemFetchResult.available(item);
@@ -298,6 +299,44 @@ class ItemApiService {
       return null;
     } catch (e) {
       print('[ItemApiService] Error triggering buy webhook: $e');
+      return null;
+    }
+  }
+
+  /// Get current solenoid state from backend
+  static Future<bool?> getSolenoidState() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/api/solenoid/state'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['solenoidOn'] == true;
+      }
+      return null;
+    } catch (e) {
+      print('[ItemApiService] Error getting solenoid state: $e');
+      return null;
+    }
+  }
+
+  /// Toggle solenoid state on backend
+  static Future<bool?> toggleSolenoid() async {
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/api/solenoid/toggle'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['solenoidOn'] == true;
+      }
+      return null;
+    } catch (e) {
+      print('[ItemApiService] Error toggling solenoid state: $e');
       return null;
     }
   }
