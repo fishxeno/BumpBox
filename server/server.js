@@ -54,14 +54,18 @@ let testing_intent;
 //webhook endpoint for stripe
 //update item to sold when payment is successful
 app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
-    let event;
-    if (req.body.testing_intent || req.body.testing_intent === false) {
-        testing_intent = req.body.testing_intent;
-        console.log("Received testing intent:", testing_intent);
-        res.status(200).json({ message: "Testing intent received" });
-        return;
+    const signature = req.headers["stripe-signature"];
+    if (!signature) {
+        const parsed = JSON.parse(req.body.toString());
+        if (parsed.testing_intent !== undefined) {
+            testing_intent = parsed.testing_intent;
+            console.log("Received testing intent (no signature):", testing_intent);
+            return res.status(200).json({ message: "Testing intent received (no signature)" });
+            
+        }
+        return res.status(400).json({ error: "there is no stripe signature and testing_intent is undefined" });
     }
-    event = stripe.webhooks.constructEvent(
+    const event = stripe.webhooks.constructEvent(
             req.body,
             req.headers["stripe-signature"],
             process.env.STRIPE_WEBHOOK_KEY,
