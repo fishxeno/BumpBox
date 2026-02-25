@@ -49,23 +49,36 @@ const cancelCapture = () => {
         captureTimeout = null;
     }
 }
-
+ 
+let testing_intent;
 //webhook endpoint for stripe
 //update item to sold when payment is successful
 app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
-    const event = stripe.webhooks.constructEvent(
-        req.body,
-        req.headers["stripe-signature"],
-        process.env.STRIPE_WEBHOOK_KEY,
-    );
-    const [rows] = await db.execute(
-            `SELECT * FROM items ORDER BY itemid DESC LIMIT 1`,
+    let event;
+    if (req.body.testing_intent || req.body.testing_intent === false) {
+        testing_intent = req.body.testing_intent;
+        console.log("Received testing intent:", testing_intent);
+        res.status(200).json({ message: "Testing intent received" });
+        return;
+    }
+    event = stripe.webhooks.constructEvent(
+            req.body,
+            req.headers["stripe-signature"],
+            process.env.STRIPE_WEBHOOK_KEY,
         );
+    const [rows] = await db.execute(`SELECT * FROM items ORDER BY itemid DESC LIMIT 1`);
     if (event.type === "payment_intent.succeeded") {
         // meaning money is charged successfully, update item to sold
         const query = `UPDATE items SET sale_status = 2 WHERE itemid = ?`;
         await db.execute(query, [rows[0].itemid]);
         await stripe.paymentLinks.update(rows[0].paymentLinkid, { active: false }); //disable payment link after successful payment
+        // store the successful transaction in database for paynow to seller purpose
+        const amount = event.data.object.amount_received;
+        // deduct 3.4% + 50 cents Stripe fees, then deduct 0.25% + 50 cents for pay out fees then deduct 3.5% for our cut, then convert to dollars from cents
+        const amountAfterFeesAndCut = Math.round((((amount * 0.966 - 50)*0.9975)-50) * 0.965) / 100;
+        const ourCut = Math.round((((amount * 0.966 - 50)*0.9975)-50) * 0.035) / 100;
+        const query2 = `INSERT INTO users (phone, amount_payable, our_cut) VALUES (?, ?, ?)`;
+        await db.execute(query2, [rows[0].phone, amountAfterFeesAndCut, ourCut]);
         res.status(200).json({ message: "Payment succeeded and item marked as sold", status: false });
 
     } else if (event.type === "checkout.session.completed") {
@@ -79,7 +92,15 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
                 paymentId: paymentIntentId
             })
         );
-        scheduleCapture(paymentIntentId);
+        if (testing_intent === true) {
+            console.log("Using testing intent for scheduling capture:", testing_intent);
+            scheduleCapture(paymentIntentId);
+            testing_intent = undefined; // reset after use
+        } else {
+            console.log("capturing payment immediately for session:", session.id);
+            await stripe.paymentIntents.capture(paymentIntentId);
+            testing_intent = undefined; // reset just in case
+        }
         //open locker for user to take out
         const query = `UPDATE items SET sale_status = 1 WHERE itemid = ?`;
         await db.execute(query, [rows[0].itemid]);
@@ -100,19 +121,18 @@ app.use(detectObjectRouter);
 
 //return within 5 mins
 //lock locker
-app.get("/api/return", (req, res) => {
+app.get("/api/return", async (req, res) => {
     try {
         cancelCapture();
-        const [rows] = db.execute(`SELECT itemid FROM items ORDER BY itemid DESC LIMIT 1`);
+        const [rows] = await db.execute(`SELECT itemid FROM items ORDER BY itemid DESC LIMIT 1`);
         const itemid = rows[0].itemid;
         const query = `UPDATE items SET sale_status = 0 WHERE itemid = ?`;
-        db.execute(query, [itemid]);
+        await db.execute(query, [itemid]);
         res.status(200).json({ message: "item returned", status: false });
     } catch (error) {
         console.error('return-item Error:', error.message);
         return res.status(500).json({ error: 'Failed to return item', error });
     }
-    
 });
 
 // Trigger ESP32 camera capture (called by Flutter app)
@@ -182,7 +202,7 @@ app.get("/api/item", async (req, res) => {
         if (rows[0].sale_status == 1 || rows[0].sale_status == 2) {
             return res
                 .status(200)
-                .json({ status: true, message: `Item is sold with status ${rows[0].sale_status === 2 ? 'empty locker' : 'sold'}`, data: rows[0] });
+                .json({ status: true, message: `Item is sold with status ${rows[0].sale_status == 2 ? 'sold' : 'empty locker'}`, data: rows[0] });
         }
         if (rows[0].sale_status == 0) {
             return res
