@@ -1,3 +1,10 @@
+/// Represents the state of the locker
+enum LockerState {
+  empty, // No item in locker
+  available, // Item available for purchase
+  sold, // Item was sold (transitional state)
+}
+
 /// Represents a listed item in the BumpBox system
 class Item {
   final String id;
@@ -8,6 +15,8 @@ class Item {
   final DateTime listedAt;
   final Duration listingDuration;
   final String? paymentLink; // Stripe payment link for purchasing
+  final bool?
+  isSold; // Whether the item has been sold (from backend status field)
 
   const Item({
     required this.id,
@@ -18,7 +27,11 @@ class Item {
     required this.listedAt,
     this.listingDuration = const Duration(days: 7),
     this.paymentLink,
+    this.isSold,
   });
+
+  /// Check if item is available for purchase (not sold)
+  bool get isAvailable => !(isSold ?? false);
 
   /// Calculate how long the item has been listed
   Duration getAge(DateTime now) {

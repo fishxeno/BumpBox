@@ -12,6 +12,7 @@ class StorageService {
   static const String _keyItemListingDurationDays =
       'current_item_listing_duration_days';
   static const String _keyItemPaymentLink = 'current_item_payment_link';
+  static const String _keyItemIsSold = 'current_item_is_sold';
   static const String _keySurgeCount = 'surge_count';
   static const String _keyPhysicalSurgeCount = 'physical_surge_count';
   static const String _keyOnlineSurgeCount = 'online_surge_count';
@@ -37,6 +38,13 @@ class StorageService {
     } else {
       await prefs.remove(_keyItemPaymentLink);
     }
+
+    // Save isSold status
+    if (item.isSold != null) {
+      await prefs.setBool(_keyItemIsSold, item.isSold!);
+    } else {
+      await prefs.remove(_keyItemIsSold);
+    }
   }
 
   /// Load item from local storage
@@ -53,6 +61,7 @@ class StorageService {
     final listedAtStr = prefs.getString(_keyItemListedAt);
     final listingDurationDays = prefs.getInt(_keyItemListingDurationDays);
     final paymentLink = prefs.getString(_keyItemPaymentLink);
+    final isSold = prefs.getBool(_keyItemIsSold);
 
     if (name == null ||
         description == null ||
@@ -74,6 +83,7 @@ class StorageService {
         listedAt: listedAt,
         listingDuration: Duration(days: listingDurationDays),
         paymentLink: paymentLink,
+        isSold: isSold,
       );
     } catch (e) {
       return null;
@@ -128,6 +138,24 @@ class StorageService {
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+  }
+
+  /// Clear current item data (when locker becomes empty)
+  static Future<void> clearCurrentItem() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Remove all item-related keys
+    await prefs.remove(_keyItemId);
+    await prefs.remove(_keyItemName);
+    await prefs.remove(_keyItemDescription);
+    await prefs.remove(_keyItemStartingPrice);
+    await prefs.remove(_keyItemFloorPrice);
+    await prefs.remove(_keyItemListedAt);
+    await prefs.remove(_keyItemListingDurationDays);
+    await prefs.remove(_keyItemPaymentLink);
+    await prefs.remove(_keyItemIsSold);
+
+    // Note: We keep surge counts as they may be useful for analytics
   }
 
   /// Check if there's saved state available

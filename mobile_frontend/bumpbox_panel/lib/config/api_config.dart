@@ -30,6 +30,9 @@ class ApiConfig {
   /// Default locker ID (for single-locker setup)
   static const String defaultLockerId = 'locker1';
 
+  /// Polling interval for checking item sold status (in seconds)
+  static const int statusPollIntervalSeconds = 15;
+
   /// Full URL for trigger capture
   static String get triggerCaptureUrl => '$baseUrl$triggerCaptureEndpoint';
 

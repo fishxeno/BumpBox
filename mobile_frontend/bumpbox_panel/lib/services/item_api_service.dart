@@ -43,7 +43,10 @@ class ItemApiService {
         return null;
       }
 
-      return _parseItemFromBackend(jsonData['data']);
+      // Extract the status field to determine if item is sold
+      final isSold = jsonData['status'] == true;
+
+      return _parseItemFromBackend(jsonData['data'], isSold: isSold);
     } catch (e) {
       print('[ItemApiService] Error fetching item: $e');
       return null;
@@ -70,7 +73,11 @@ class ItemApiService {
   /// - listedAt: calculated from datetime_expire - listingDuration
   /// - listingDuration: from pricing config
   /// - paymentLink: from paymentLink
-  static Item _parseItemFromBackend(Map<String, dynamic> data) {
+  /// - isSold: whether the item has been sold (from status field)
+  static Item _parseItemFromBackend(
+    Map<String, dynamic> data, {
+    bool isSold = false,
+  }) {
     final itemId = data['itemid']?.toString() ?? 'unknown';
     final itemName = data['item_name']?.toString() ?? 'Unknown Item';
     final price = _parsePrice(data['price']);
@@ -94,6 +101,7 @@ class ItemApiService {
       listedAt: listedAt,
       listingDuration: PricingConfig.listingDuration,
       paymentLink: paymentLink,
+      isSold: isSold,
     );
   }
 
@@ -183,6 +191,47 @@ class ItemApiService {
       return jsonData['status'] == true;
     } catch (e) {
       print('[ItemApiService] Error checking payment status: $e');
+      return null;
+    }
+  }
+
+  /// Update the price of the latest item
+  ///
+  /// Creates a new Stripe price and payment link for the item.
+  /// Returns the updated Item with the new payment link, or null if an error occurs.
+  ///
+  /// This is used when the dynamic pricing changes significantly and needs
+  /// to be reflected in the backend and payment system.
+  static Future<Item?> updateItemPrice(double newPrice) async {
+    try {
+      print(
+        '[ItemApiService] Updating item price to \$${newPrice.toStringAsFixed(2)}',
+      );
+
+      final response = await http.put(
+        Uri.parse('${ApiConfig.baseUrl}/api/item/price'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'price': newPrice}),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Failed to update price: ${response.statusCode} ${response.body}',
+        );
+      }
+
+      final jsonData = jsonDecode(response.body);
+
+      if (jsonData['items'] == null || jsonData['items'].isEmpty) {
+        print('[ItemApiService] No item data in update response');
+        return null;
+      }
+
+      // Parse the updated item
+      final updatedItemData = jsonData['items'][0];
+      return _parseItemFromBackend(updatedItemData, isSold: false);
+    } catch (e) {
+      print('[ItemApiService] Error updating price: $e');
       return null;
     }
   }
