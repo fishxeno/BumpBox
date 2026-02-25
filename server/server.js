@@ -58,15 +58,15 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
         req.headers["stripe-signature"],
         process.env.STRIPE_WEBHOOK_KEY,
     );
-    if (event.type === "payment_intent.succeeded") {
-        // meaning money is charged successfully, update item to sold
-        //mysql doesn't want select and update in the same query, so we have to do it in 2 queries
-        const [rows] = await db.execute(
+    const [rows] = await db.execute(
             `SELECT * FROM items ORDER BY itemid DESC LIMIT 1`,
         );
-        const query = `UPDATE items SET sale_status = 1 WHERE itemid = ?`;
+    if (event.type === "payment_intent.succeeded") {
+        // meaning money is charged successfully, update item to sold
+        const query = `UPDATE items SET sale_status = 2 WHERE itemid = ?`;
         await db.execute(query, [rows[0].itemid]);
-        await stripe.paymentLinks.update(rows[0].paymentLinkid, { active: false });
+        await stripe.paymentLinks.update(rows[0].paymentLinkid, { active: false }); //disable payment link after successful payment
+        res.status(200).json({ message: "Payment succeeded and item marked as sold", status: false });
 
     } else if (event.type === "checkout.session.completed") {
         // meaning checkout is completed, but money is not charged yet, we will capture the payment after 5 minutes
@@ -80,6 +80,10 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
             })
         );
         scheduleCapture(paymentIntentId);
+        //open locker for user to take out
+        const query = `UPDATE items SET sale_status = 1 WHERE itemid = ?`;
+        await db.execute(query, [rows[0].itemid]);
+        res.status(200).json({ message: "Checkout completed, locker unlocked, capture scheduled", status: true });
     }
     res.sendStatus(200);
 });
@@ -94,9 +98,21 @@ app.use(urlencoded({ extended: true }));
 app.use(methodOverride());
 app.use(detectObjectRouter);
 
+//return within 5 mins
+//lock locker
 app.get("/return", (req, res) => {
-    cancelCapture();
-    res.sendStatus(200);
+    try {
+        cancelCapture();
+        const [rows] = db.execute(`SELECT itemid FROM items ORDER BY itemid DESC LIMIT 1`);
+        const itemid = rows[0].itemid;
+        const query = `UPDATE items SET sale_status = 0 WHERE itemid = ?`;
+        db.execute(query, [itemid]);
+        res.status(200).json({ message: "item returned", status: false });
+    } catch (error) {
+        console.error('return-item Error:', error.message);
+        return res.status(500).json({ error: 'Failed to return item', error });
+    }
+    
 });
 
 // Trigger ESP32 camera capture (called by Flutter app)
@@ -163,15 +179,21 @@ app.get("/api/item", async (req, res) => {
         if (rows.length === 0) {
             return res.status(404).json({ error: "Item not found", status: false });
         }
-        if (rows[0].sale_status == 1) {
+        if (rows[0].sale_status == 1 || rows[0].sale_status == 2) {
             return res
                 .status(200)
-                .json({ status: true, message: "Item is sold", data: rows[0] });
+                .json({ status: true, message: `Item is sold with status ${rows[0].sale_status === 2 ? 'empty locker' : 'sold'}`, data: rows[0] });
         }
+        if (rows[0].sale_status == 0) {
+            return res
+                .status(200)
+                .json({ status: false, message: "Item is not sold", data: rows[0] });
+        }
+
         return res.status(200).json({
             status: false,
-            message: "Item is not sold",
-            data: rows[0],
+            message: "Something weird happened so keep it locked",
+            data: rows,
         });
 
     } catch (error) {
@@ -241,22 +263,22 @@ app.post('/api/test/simulate-detection', (req, res) => {
     }
 });
 
-//capture payment endpoint
-app.post("/api/capture", async (req, res) => {
-    try {
-        const paymentIntentId = req.body.paymentIntentId;
-        const paymentIntent =
-            await stripe.paymentIntents.capture(paymentIntentId);
-        const query = `UPDATE items SET sale_status = 0 WHERE priceid = ?`;
-        const [rows] = await db.execute(query, [paymentIntent.payment_method]);
-        return res
-            .status(200)
-            .json({ message: "Payment captured successfully", data: rows });
-    } catch (error) {
-        console.error("Capture payment error:", error.stack);
-        return res.status(500).json({ error: "Error capturing payment" });
-    }
-});
+// //capture payment endpoint
+// app.post("/api/capture", async (req, res) => {
+//     try {
+//         const paymentIntentId = req.body.paymentIntentId;
+//         const paymentIntent =
+//             await stripe.paymentIntents.capture(paymentIntentId);
+//         const query = `UPDATE items SET sale_status = 0 WHERE priceid = ?`;
+//         const [rows] = await db.execute(query, [paymentIntent.payment_method]);
+//         return res
+//             .status(200)
+//             .json({ message: "Payment captured successfully", data: rows });
+//     } catch (error) {
+//         console.error("Capture payment error:", error.stack);
+//         return res.status(500).json({ error: "Error capturing payment" });
+//     }
+// });
 
 //create new item endpoint
 app.post("/api/item", async (req, res) => {
