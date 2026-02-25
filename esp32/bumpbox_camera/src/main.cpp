@@ -15,15 +15,21 @@
 #include <HTTPClient.h>
 #include "esp_camera.h"
 #include <ArduinoJson.h>
+#include <PubSubClient.h>
 
 // ====================== CONFIGURATION ======================
 // -- WiFi (change these!) --
-const char* WIFI_SSID     = "YOUR_WIFI_SSID";       // <-- Change this
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";    // <-- Change this
+const char* WIFI_SSID     = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 
 // -- Server --
 const char* SERVER_URL = "http://bumpbox-env-1.eba-43hmmxwt.ap-southeast-1.elasticbeanstalk.com/detect-object";
-const bool  USE_MOCK   = false;  // true = test mode, false = real Google Vision API
+const bool  USE_MOCK   = false;  // false = real Google Vision API detection
+
+// -- MQTT --
+const char* MQTT_BROKER = "broker.hivemq.com";
+const int   MQTT_PORT   = 1883;
+const char* MQTT_TOPIC  = "bumpbox/led";
 
 // -- Pins --
 #define BUTTON_PIN     13   // Trigger button (connect to GND)
@@ -57,9 +63,13 @@ const bool  USE_MOCK   = false;  // true = test mode, false = real Google Vision
 #define WIFI_TIMEOUT_MS   15000
 #define HTTP_TIMEOUT_MS   15000
 #define FLASH_WARMUP_MS   150
+#define MQTT_RECONNECT_MS 5000
 
 // ====================== GLOBALS ======================
 unsigned long lastButtonPress = 0;
+WiFiClient   espClient;
+PubSubClient mqttClient(espClient);
+unsigned long lastMqttReconnect = 0;
 
 // ====================== FORWARD DECLARATIONS ======================
 void flashLED(int times, int durationMs);
@@ -69,6 +79,8 @@ bool initCamera();
 void captureAndSend();
 bool sendToServer(uint8_t* imageData, size_t imageLen);
 void parseResponse(const String& response);
+void mqttCallback(char* topic, byte* payload, unsigned int length);
+void connectMQTT();
 
 // ====================== LED HELPERS ======================
 
@@ -114,6 +126,43 @@ void connectWiFi() {
   Serial.println();
   Serial.print("[WiFi] Connected! IP: ");
   Serial.println(WiFi.localIP());
+}
+
+// ====================== MQTT ======================
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  char message[length + 1];
+  memcpy(message, payload, length);
+  message[length] = '\0';
+
+  Serial.printf("[MQTT] Received on '%s': %s\n", topic, message);
+
+  if (strcmp(topic, MQTT_TOPIC) == 0) {
+    if (strcmp(message, "on") == 0) {
+      digitalWrite(FLASH_LED_PIN, HIGH);
+      Serial.println("[MQTT] Flash LED ON");
+    } else if (strcmp(message, "off") == 0) {
+      digitalWrite(FLASH_LED_PIN, LOW);
+      Serial.println("[MQTT] Flash LED OFF");
+    }
+  }
+}
+
+void connectMQTT() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  String clientId = "bumpbox-esp32-" + String(random(0xFFFF), HEX);
+  Serial.printf("[MQTT] Connecting to %s:%d as %s...\n",
+                MQTT_BROKER, MQTT_PORT, clientId.c_str());
+
+  if (mqttClient.connect(clientId.c_str())) {
+    Serial.println("[MQTT] Connected!");
+    mqttClient.subscribe(MQTT_TOPIC, 1);
+    Serial.printf("[MQTT] Subscribed to: %s\n", MQTT_TOPIC);
+  } else {
+    Serial.printf("[MQTT] Failed, rc=%d. Will retry in %ds\n",
+                  mqttClient.state(), MQTT_RECONNECT_MS / 1000);
+  }
 }
 
 // ====================== CAMERA ======================
@@ -340,10 +389,26 @@ void setup() {
   }
 
   connectWiFi();
+
+  // MQTT setup
+  mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+  mqttClient.setCallback(mqttCallback);
+  connectMQTT();
+
   Serial.println("[Ready] Waiting for trigger...\n");
 }
 
 void loop() {
+  // MQTT: maintain connection and process incoming messages
+  if (!mqttClient.connected()) {
+    unsigned long now = millis();
+    if (now - lastMqttReconnect > MQTT_RECONNECT_MS) {
+      lastMqttReconnect = now;
+      connectMQTT();
+    }
+  }
+  mqttClient.loop();
+
   bool trigger = false;
 
   // Button check (active LOW, with debounce)
