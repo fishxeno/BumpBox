@@ -305,23 +305,6 @@ app.post('/api/test/simulate-detection', (req, res) => {
     }
 });
 
-// //capture payment endpoint
-// app.post("/api/capture", async (req, res) => {
-//     try {
-//         const paymentIntentId = req.body.paymentIntentId;
-//         const paymentIntent =
-//             await stripe.paymentIntents.capture(paymentIntentId);
-//         const query = `UPDATE items SET sale_status = 0 WHERE priceid = ?`;
-//         const [rows] = await db.execute(query, [paymentIntent.payment_method]);
-//         return res
-//             .status(200)
-//             .json({ message: "Payment captured successfully", data: rows });
-//     } catch (error) {
-//         console.error("Capture payment error:", error.stack);
-//         return res.status(500).json({ error: "Error capturing payment" });
-//     }
-// });
-
 //create new item endpoint
 app.post("/api/item", async (req, res) => {
     try {
