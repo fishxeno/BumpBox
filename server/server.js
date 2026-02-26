@@ -15,7 +15,7 @@ import { addDaysAndFormat } from "./utils/helperfunctions.js";
 import { setCaptureTrigger, getAndResetCaptureTrigger, getLatestDetection, storeDetection, latestDetection } from './storage.js';
 
 const app = express();
-const __dirname = resolve();
+const __dirname = resolve(); 
 //reverse proxy setup + static files
 app.use(expressStatic(join(__dirname, "public")));
 app.set("trust proxy", true);
