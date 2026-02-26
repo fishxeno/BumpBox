@@ -99,13 +99,13 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
         // meaning checkout is completed, but money is not charged yet, we will capture the payment after 5 minutes
         const session = event.data.object;
         const paymentIntentId = session.payment_intent;
-        mqttClient.publish(
-            "esp32/door1/alayerofsecurity/unlock",
-            JSON.stringify({
-                action: "unlock",
-                paymentId: paymentIntentId
-            })
-        );
+        // mqttClient.publish(
+        //     "esp32/door1/alayerofsecurity/unlock",
+        //     JSON.stringify({
+        //         action: "unlock",
+        //         paymentId: paymentIntentId
+        //     })
+        // );
 
         solenoidState = true; // Unlock door for buyer to retrieve item
         console.log("[solenoid] Checkout completed, unlocking door");
