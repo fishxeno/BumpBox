@@ -1,10 +1,5 @@
 import "dotenv/config";
-import express, {
-    raw,
-    json,
-    urlencoded,
-    static as expressStatic,
-} from "express";
+import express, { raw, json, urlencoded, static as expressStatic } from "express";
 import { resolve, join } from "path";
 import methodOverride from "method-override";
 import detectObjectRouter from "./routes/detectObject.js";
@@ -15,7 +10,7 @@ import { addDaysAndFormat } from "./utils/helperfunctions.js";
 import { setCaptureTrigger, getAndResetCaptureTrigger, getLatestDetection, storeDetection, latestDetection } from './storage.js';
 
 const app = express();
-const __dirname = resolve(); 
+const __dirname = resolve();
 //reverse proxy setup + static files
 app.use(expressStatic(join(__dirname, "public")));
 app.set("trust proxy", true);
@@ -42,7 +37,7 @@ const cancelCapture = () => {
         captureTimeout = null;
     }
 }
- 
+
 let testing_intent;
 let solenoidState = false; // Global state for solenoid control
 
@@ -99,13 +94,6 @@ app.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
         // meaning checkout is completed, but money is not charged yet, we will capture the payment after 5 minutes
         const session = event.data.object;
         const paymentIntentId = session.payment_intent;
-        // mqttClient.publish(
-        //     "esp32/door1/alayerofsecurity/unlock",
-        //     JSON.stringify({
-        //         action: "unlock",
-        //         paymentId: paymentIntentId
-        //     })
-        // );
 
         solenoidState = true; // Unlock door for buyer to retrieve item
         console.log("[solenoid] Checkout completed, unlocking door");
