@@ -607,16 +607,17 @@ class _KioskDashboardScreenState extends State<KioskDashboardScreen>
         mainAxisAlignment: MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Solenoid Toggle Button (TEST)
-          FloatingActionButton.extended(
-            onPressed: _toggleSolenoid,
-            icon: Icon(_solenoidOn ? Icons.lock_open : Icons.lock),
-            label: Text('Solenoid: ${_solenoidOn ? 'ON' : 'OFF'}'),
-            backgroundColor: _solenoidOn ? Colors.red : Colors.grey.shade700,
-            foregroundColor: Colors.white,
-            tooltip: 'Toggle Solenoid (Testing)',
-            heroTag: 'solenoid_toggle',
-          ),
+          if (_debugMode)
+            // Solenoid Toggle Button (TEST)
+            FloatingActionButton.extended(
+              onPressed: _toggleSolenoid,
+              icon: Icon(_solenoidOn ? Icons.lock_open : Icons.lock),
+              label: Text('Solenoid: ${_solenoidOn ? 'ON' : 'OFF'}'),
+              backgroundColor: _solenoidOn ? Colors.red : Colors.grey.shade700,
+              foregroundColor: Colors.white,
+              tooltip: 'Toggle Solenoid (Testing)',
+              heroTag: 'solenoid_toggle',
+            ),
           const SizedBox(height: 16),
           // Debug buttons (only visible when debug mode is enabled)
           if (_debugMode) ...[
