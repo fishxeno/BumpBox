@@ -29,24 +29,24 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
           cache-dependency-path: |
-            server/package-lock.json
-#            bumpbox/package-lock.json
+            bumpbox/package-lock.json
+            server/package-lock.json 
 
       # ---------- FRONTEND ----------
-      # - name: Install frontend dependencies
-      #   working-directory: bumpbox
-      #   run: npm ci
+      - name: Install frontend dependencies
+        working-directory: bumpbox
+        run: npm ci
 
-      # - name: Build frontend
-      #   working-directory: bumpbox
-      #   run: npm run build
+      - name: Build frontend
+        working-directory: bumpbox
+        run: npm run build
 
 
-      # - name: Copy frontend build into server
-      #   run: |
-      #     rm -rf server/public
-      #     mkdir -p server/public
-      #     cp -r bumpbox/dist/* server/public/
+      - name: Copy frontend build into server
+        run: |
+          rm -rf server/public
+          mkdir -p server/public
+          cp -r bumpbox/dist/* server/public/
 
       # ---------- BACKEND ----------
       - name: Generate deployment package
