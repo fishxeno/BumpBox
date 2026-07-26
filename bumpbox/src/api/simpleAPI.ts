@@ -10,21 +10,9 @@ import {
 } from "@tanstack/react-query";
 
 
-function isLocalhost() {
-  if (typeof window === "undefined") return false;
+import { API_BASE_URL } from "./config";
 
-  const host = window.location.hostname;
-
-  return (
-    host === "localhost" ||
-    host === "127.0.0.1" ||
-    host === "[::1]"
-  );
-}
-
-if (isLocalhost()) {
-  axios.defaults.baseURL = "http://localhost:8080";
-}
+axios.defaults.baseURL = API_BASE_URL;
 
 
 /* ---------------------------------- */
@@ -72,16 +60,16 @@ function handleAxiosError(error: unknown): never {
 /* GET Hook */
 /* ---------------------------------- */
 
-export function useAPIQuery<TData = unknown>(
+export function useAPIQuery<TQueryFnData = unknown, TData = TQueryFnData>(
     key: QueryKey,
     url: string,
-    options?: Omit<UseQueryOptions<TData, APIError>, "queryKey" | "queryFn">,
+    options?: Omit<UseQueryOptions<TQueryFnData, APIError, TData>, "queryKey" | "queryFn">,
 ) {
-    return useQuery<TData, APIError>({
+    return useQuery<TQueryFnData, APIError, TData>({
         queryKey: key,
         queryFn: async () => {
             try {
-                const response = await axios.get<TData>(url);
+                const response = await axios.get<TQueryFnData>(url);
                 return response.data;
             } catch (err) {
                 handleAxiosError(err);

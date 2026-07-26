@@ -201,6 +201,23 @@ app.get('/api/detections/latest-image', (req, res) => {
     }
 });
 
+// Get all items
+app.get("/api/items", async (req, res) => {
+    try {
+        const query = `SELECT * FROM items ORDER BY itemid DESC`;
+        const [rows] = await db.execute(query);
+
+        if (rows.length === 0) {
+            return res.status(200).json({ status: true, message: "No items found", data: [] });
+        }
+
+        return res.status(200).json({ status: true, message: "Items retrieved successfully", data: rows });
+    } catch (error) {
+        console.error("Get all items error:", error.stack);
+        return res.status(500).json({ error: "Error fetching items" });
+    }
+});
+
 //get item, for esp polling, we will only return the latest item, as the esp will only display the latest item
 app.get("/api/item", async (req, res) => {
     try {

@@ -6,25 +6,40 @@ import {
 
 export const itemQueries = {
     ITEM: () => ["item"] as const,
+    ITEMS: () => ["items"] as const,
 };
 
 export const itemBaseRoute = "/api/items";
 
+interface ItemData {
+    id: number;
+    item_name: string;
+    phone: string;
+    price: number;
+    description: string;
+    days: number;
+}
+
 interface GetItem {
     status: boolean;
-    data: {
-        id: number;
-        item_name: string;
-        phone: string;
-        price: number;
-        description: string;
-        days: number;
-    };
+    data: ItemData;
+    message: string;
+}
+
+interface GetItems {
+    status: boolean;
+    data: ItemData[];
     message: string;
 }
 
 export function useItem() {
     return useAPIQuery<GetItem>(itemQueries.ITEM(), `/api/item`);
+}
+
+export function useItems() {
+    return useAPIQuery<GetItems, ItemData[]>(itemQueries.ITEMS(), itemBaseRoute, {
+        select: (response) => response.data,
+    });
 }
 
 interface CreateItemInterface {
