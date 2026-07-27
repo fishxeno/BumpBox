@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal, Button, Spinner } from "react-bootstrap";
 import { QRCodeSVG } from "qrcode.react";
 import { formatPrice } from "../config/pricingConfig";
@@ -22,37 +22,36 @@ export default function PaymentDialog({
     checkPaymentStatus,
 }: PaymentDialogProps) {
     const [isPaymentComplete, setIsPaymentComplete] = useState(false);
-    const [isPolling, setIsPolling] = useState(true);
-    const pollCountRef = { current: 0 };
+    const pollCountRef = useRef(0);
     const maxPolls = 150;
-
-    useEffect(() => {
-        if (!show || !item.paymentLink) return;
-
+    const handleClose = useCallback((success: boolean) => {
         setIsPaymentComplete(false);
-        setIsPolling(true);
-        pollCountRef.current = 0;
+        onClose(success);
+    }, [onClose]);
+    useEffect(() => {
+        if (!show || !item.paymentLink || isPaymentComplete) return;
 
+        pollCountRef.current = 0;
+        
         const interval = setInterval(async () => {
-            pollCountRef.current += 1;
+            pollCountRef.current++;
 
             if (pollCountRef.current >= maxPolls) {
                 clearInterval(interval);
-                setIsPolling(false);
                 return;
             }
 
             const isPaid = await checkPaymentStatus();
-            if (isPaid === true) {
+
+            if (isPaid) {
                 clearInterval(interval);
                 setIsPaymentComplete(true);
-                setIsPolling(false);
-                setTimeout(() => onClose(true), 2000);
+                setTimeout(() => handleClose(true), 2000);
             }
         }, 2000);
 
         return () => clearInterval(interval);
-    }, [show, item.paymentLink, checkPaymentStatus, onClose]);
+    }, [show, item.paymentLink, isPaymentComplete, checkPaymentStatus, onClose, handleClose]);
 
     const copyPaymentLink = () => {
         if (item.paymentLink) {
@@ -61,7 +60,12 @@ export default function PaymentDialog({
     };
 
     return (
-        <Modal show={show} onHide={() => onClose(false)} centered backdrop="static">
+        <Modal
+            show={show}
+            onHide={() => handleClose(false)}
+            centered
+            backdrop="static"
+        >
             <Modal.Header closeButton={!isPaymentComplete}>
                 <Modal.Title>
                     {isPaymentComplete
@@ -76,36 +80,54 @@ export default function PaymentDialog({
                     <div className="text-center py-3">
                         <div className="payment-success-icon mb-3">✓</div>
                         <p>Thank you for your purchase!</p>
-                        <p className="text-muted">The locker will unlock shortly.</p>
+                        <p className="text-muted">
+                            The locker will unlock shortly.
+                        </p>
                     </div>
                 ) : (
                     <>
                         {isTestMode && (
                             <div className="test-mode-banner mb-3">
-                                You have 5 minutes to return this item for a full refund
+                                You have 5 minutes to return this item for a
+                                full refund
                             </div>
                         )}
 
                         <div className="price-display-box text-center mb-4">
                             <div className="price-label">Current Price</div>
-                            <div className="price-value">{formatPrice(currentPrice)}</div>
+                            <div className="price-value">
+                                {formatPrice(currentPrice)}
+                            </div>
                         </div>
 
                         {item.paymentLink ? (
                             <>
-                                <p className="text-center fw-semibold mb-3">Scan to Pay</p>
+                                <p className="text-center fw-semibold mb-3">
+                                    Scan to Pay
+                                </p>
                                 <div className="qr-container d-flex justify-content-center mb-3">
-                                    <QRCodeSVG value={item.paymentLink} size={200} />
+                                    <QRCodeSVG
+                                        value={item.paymentLink}
+                                        size={200}
+                                    />
                                 </div>
-                                <button type="button" className="payment-link-copy" onClick={copyPaymentLink}>
+                                <button
+                                    type="button"
+                                    className="payment-link-copy"
+                                    onClick={copyPaymentLink}
+                                >
                                     {item.paymentLink}
                                 </button>
-                                <p className="text-center text-muted small mt-2">Tap to copy payment link</p>
+                                <p className="text-center text-muted small mt-2">
+                                    Tap to copy payment link
+                                </p>
 
-                                {isPolling && (
+                                {!isPaymentComplete && (
                                     <div className="d-flex align-items-center justify-content-center gap-2 mt-4">
                                         <Spinner size="sm" />
-                                        <span className="text-muted fst-italic">Waiting for payment...</span>
+                                        <span className="text-muted fst-italic">
+                                            Waiting for payment...
+                                        </span>
                                     </div>
                                 )}
                             </>
@@ -119,7 +141,10 @@ export default function PaymentDialog({
             </Modal.Body>
             {!isPaymentComplete && (
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={() => onClose(false)}>
+                    <Button
+                        variant="secondary"
+                        onClick={() => handleClose(false)}
+                    >
                         Cancel
                     </Button>
                 </Modal.Footer>

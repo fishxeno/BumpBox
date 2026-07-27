@@ -8,6 +8,7 @@ import {
 import {
     checkPaymentStatus,
     fetchLatestItem,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     getSolenoidState,
     returnItem,
     toggleSolenoid,
@@ -323,7 +324,8 @@ export function useKioskDashboard() {
 
     useEffect(() => {
         const interval = setInterval(async () => {
-            const state = await getSolenoidState();
+            // const state = await getSolenoidState();
+            const state = null
             if (state != null) setSolenoidOn(state);
         }, 5000);
 
