@@ -81,6 +81,7 @@ export function useKioskDashboard() {
         setTimeout(() => setToast(null), 3000);
     }, []);
 
+    
     const updatePrices = useCallback(
         (item: Item | null, surge: number) => {
             if (!item) return;
