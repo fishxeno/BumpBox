@@ -8,8 +8,7 @@ import {
 import {
     checkPaymentStatus,
     fetchLatestItem,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    getSolenoidState,
+    // getSolenoidState,
     returnItem,
     toggleSolenoid,
     triggerBuyWebhook,
@@ -81,7 +80,7 @@ export function useKioskDashboard() {
         setTimeout(() => setToast(null), 3000);
     }, []);
 
-    
+
     const updatePrices = useCallback(
         (item: Item | null, surge: number) => {
             if (!item) return;
